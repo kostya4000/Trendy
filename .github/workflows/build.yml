@@ -1,0 +1,61 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      # Оба пути сборки должны оставаться рабочими: Gradle и build.sh.
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+      - name: Gradle debug build
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Manual signed build
+        run: |
+          export PATH="$ANDROID_SDK_ROOT/build-tools/35.0.0:$PATH"
+          export ANDROID_JAR="$ANDROID_SDK_ROOT/platforms/android-35/android.jar"
+          ./build.sh
+
+      - name: Check tag matches version.properties
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          name=$(sed -n 's/^versionName=//p' version.properties | tail -n 1)
+          if [ "v$name" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Тег ${GITHUB_REF_NAME} не совпадает с versionName=v$name"
+            exit 1
+          fi
+          test -f "build/Trendy-$name.apk" || { echo "::error::Нет build/Trendy-$name.apk"; exit 1; }
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: trendy-apk
+          if-no-files-found: error
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            build/Trendy-*.apk

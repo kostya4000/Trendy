@@ -12,8 +12,10 @@ AndroidX, no third-party dependencies, and Russian UI text.
   in the repo; install the Termux packages listed in `README.md` or use Android Studio.
 - The Gradle wrapper is committed; `./gradlew :app:assembleDebug` builds the debug APK
   (Gradle 9.6.0, AGP 9.5.0). The manual script and Gradle build are separate paths; keep both working.
-- No tests, lint, formatter, codegen, or CI. Verification = successful APK build,
+- No tests, lint, formatter, or codegen. Verification = successful APK build,
   `apksigner verify`, and a manual device smoke test (feed load, playback, notification).
+  CI is `.github/workflows/build.yml`: on push/PR it builds both Gradle debug and
+  `./build.sh`, and on `v*` tags it fails if the tag does not match `versionName`.
 - Version source of truth is `version.properties`, read by both `build.sh` and Gradle.
   Bump it with `./tools/bump-version.sh patch|minor|major` (always increments `versionCode`);
   do not hardcode versions in `build.sh` or `app/build.gradle.kts`.
