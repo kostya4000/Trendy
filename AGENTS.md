@@ -21,6 +21,10 @@ AndroidX, no third-party dependencies, and Russian UI text.
   path, so `sha256sum -c` fails; compare the hash manually and update both on release.
 - `keystore.jks` is intentionally in the project and is the update-signing key. It is
   gitignored: never commit, publish, or share it; do not regenerate it for updates.
+- Remote is `https://github.com/kostya4000/Trendy` (private, `main`). Release flow:
+  `./tools/bump-version.sh`, `./build.sh`, commit, `git tag -a v<version>`, push tags,
+  then publish a GitHub Release with `build/Trendy-<version>.apk` and `SHA256SUMS.txt`.
+  Never attach `keystore.jks` or `local.properties` to a release.
 
 ## Build quirks
 

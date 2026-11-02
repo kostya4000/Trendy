@@ -75,6 +75,29 @@ AndroidX и внешние библиотеки, поэтому зависимо
 
 Скрипт всегда увеличивает `versionCode` на 1 и обновляет `versionName`.
 
+## Релиз
+
+Код живёт в приватном репозитории
+[`kostya4000/Trendy`](https://github.com/kostya4000/Trendy). Каждый релиз — новая
+версия, тег и APK в GitHub Releases.
+
+```bash
+./tools/bump-version.sh patch        # 1.1 -> 1.1.1, versionCode +1
+./build.sh                           # build/Trendy-<версия>.apk
+git commit -am "Trendy <версия>: <что изменилось>"
+git tag -a v<версия> -m "Trendy <версия>"
+git push origin main --tags
+```
+
+Затем создайте релиз и приложите `build/Trendy-<версия>.apk` и `SHA256SUMS.txt`:
+
+```bash
+sha256sum build/Trendy-1.1.apk | awk '{print $1"  Trendy-1.1.apk"}' > SHA256SUMS.txt
+```
+
+`keystore.jks` остаётся только локально: он в `.gitignore` и никогда не попадает
+в репозиторий, но именно им подписываются обновления.
+
 ## Как это работает
 
 1. `PromoDjApi` загружает HTML страницы `/trendy/<жанр>[/<фильтр>]` и вытаскивает
