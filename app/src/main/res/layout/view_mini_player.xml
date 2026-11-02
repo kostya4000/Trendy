@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/miniPlayer"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="10dp"
+    android:layout_marginEnd="10dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="10dp"
+    android:background="@drawable/bg_mini"
+    android:elevation="12dp"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <ProgressBar
+        android:id="@+id/miniProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:max="1000"
+        android:progress="0"
+        android:progressBackgroundTint="#1FFFFFFF"
+        android:progressTint="@color/accent" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="6dp">
+
+        <com.promodj.trendy.RoundedImageView
+            android:id="@+id/miniCover"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_cover_placeholder"
+            android:contentDescription="@null" />
+
+        <LinearLayout
+            android:id="@+id/miniInfo"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:focusable="true"
+            android:foreground="@drawable/bg_focus_ring"
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:paddingEnd="6dp">
+
+            <TextView
+                android:id="@+id/miniTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text"
+                android:textSize="14sp"
+                android:fontFamily="sans-serif-medium" />
+
+            <TextView
+                android:id="@+id/miniArtist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/miniPlay"
+            android:layout_width="42dp"
+            android:focusable="true"
+            android:layout_height="42dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:foreground="@drawable/bg_focus_circle"
+            android:padding="8dp"
+            android:src="@drawable/ic_play_white"
+            android:contentDescription="@string/play" />
+
+        <ImageButton
+            android:id="@+id/miniNext"
+            android:layout_width="38dp"
+            android:focusable="true"
+            android:layout_height="38dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:foreground="@drawable/bg_focus_circle"
+            android:padding="8dp"
+            android:src="@drawable/ic_next_white"
+            android:contentDescription="@string/next" />
+    </LinearLayout>
+</LinearLayout>

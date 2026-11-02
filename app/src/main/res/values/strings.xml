@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Trendy</string>
+    <string name="header_title">TRENDY</string>
+    <string name="header_sub">promodj.com · музыка сообщества</string>
+    <string name="refresh">Обновить</string>
+    <string name="filter_all">Всё вместе</string>
+    <string name="filter_mixes">Миксы</string>
+    <string name="filter_tracks">Треки</string>
+    <string name="empty_title">Пока пусто</string>
+    <string name="empty_text">Не удалось получить список. Проверьте соединение и попробуйте ещё раз.</string>
+    <string name="retry">Повторить</string>
+    <string name="now_playing">СЕЙЧАС ИГРАЕТ</string>
+    <string name="download">Скачать</string>
+    <string name="open_site">На PromoDJ</string>
+    <string name="play">Играть</string>
+    <string name="pause">Пауза</string>
+    <string name="next">Следующий</string>
+    <string name="prev">Предыдущий</string>
+    <string name="share">Поделиться</string>
+    <string name="back">Назад</string>
+    <string name="stop">Остановить</string>
+    <string name="error_network">Не удалось обновить ленту</string>
+    <string name="download_started">Загрузка началась</string>
+    <string name="download_unavailable">Скачивание недоступно</string>
+    <string name="link_error">Не удалось открыть ссылку</string>
+    <string name="channel_name">Воспроизведение</string>
+    <string name="channel_description">Плеер PromoDJ Trendy</string>
+    <string name="notification_album">PromoDJ Trendy</string>
+    <string name="loading">Загрузка…</string>
+    <string name="cache">В кэш</string>
+    <string name="cached">В кэше</string>
+    <string name="caching">Загрузка…</string>
+    <string name="cache_started">Загрузка в кэш началась</string>
+    <string name="cache_done">Сохранено в кэш</string>
+    <string name="cache_failed">Не удалось сохранить в кэш</string>
+    <string name="cache_unavailable">Нет ссылки для загрузки</string>
+    <string name="cache_already">Уже в кэше</string>
+    <string name="cache_downloading">Уже загружается</string>
+</resources>
