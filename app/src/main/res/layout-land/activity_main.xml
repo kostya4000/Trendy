@@ -72,6 +72,7 @@
             android:layout_marginTop="10dp"
             android:focusable="true"
             android:foreground="@drawable/bg_focus_ring"
+            android:nextFocusDown="@id/miniProgress"
             android:orientation="vertical"
             android:padding="6dp">
 
@@ -103,6 +104,8 @@
             android:layout_height="30dp"
             android:layout_marginTop="8dp"
             android:focusable="true"
+            android:nextFocusDown="@id/miniPlay"
+            android:nextFocusUp="@id/miniInfo"
             android:foreground="@drawable/bg_focus_ring"
             android:max="1000"
             android:paddingStart="0dp"
@@ -160,7 +163,6 @@
                 android:layout_height="66dp"
                 android:layout_marginStart="18dp"
                 android:layout_marginEnd="18dp"
-                android:nextFocusRight="@id/list"
                 android:background="@drawable/bg_play_circle"
                 android:contentDescription="@string/play"
                 android:focusable="true"
@@ -172,12 +174,55 @@
                 android:id="@+id/miniNext"
                 android:layout_width="50dp"
                 android:layout_height="50dp"
+                android:nextFocusRight="@id/list"
                 android:background="@drawable/bg_round_button"
                 android:contentDescription="@string/next"
                 android:focusable="true"
                 android:foreground="@drawable/bg_focus_circle"
                 android:padding="12dp"
                 android:src="@drawable/ic_next_white" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/panelCache"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_pill_button"
+                android:nextFocusRight="@id/panelDownload"
+                android:drawableStart="@drawable/ic_cache"
+                android:drawablePadding="6dp"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:foreground="@drawable/bg_focus_ring"
+                android:gravity="center"
+                android:text="@string/cache"
+                android:textColor="@color/text_dim"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/panelDownload"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_pill_button"
+                android:nextFocusRight="@id/list"
+                android:drawableStart="@drawable/ic_download"
+                android:drawablePadding="6dp"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:foreground="@drawable/bg_focus_ring"
+                android:gravity="center"
+                android:text="@string/download"
+                android:textColor="@color/text_dim"
+                android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -213,7 +258,7 @@
         <LinearLayout
             android:id="@+id/filterBar"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
+            android:layout_height="50dp"
             android:layout_marginStart="16dp"
             android:layout_marginTop="8dp"
             android:layout_marginEnd="16dp"
@@ -227,13 +272,13 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:focusable="true"
-                android:nextFocusLeft="@id/miniPlay"
+                android:nextFocusDown="@id/list"
                 android:fontFamily="sans-serif-medium"
                 android:foreground="@drawable/bg_focus_ring"
                 android:gravity="center"
                 android:text="@string/filter_all"
                 android:textColor="@color/text"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
             <TextView
                 android:id="@+id/filterMixes"
@@ -241,13 +286,13 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:focusable="true"
-                android:nextFocusLeft="@id/miniPlay"
+                android:nextFocusDown="@id/list"
                 android:fontFamily="sans-serif-medium"
                 android:foreground="@drawable/bg_focus_ring"
                 android:gravity="center"
                 android:text="@string/filter_mixes"
                 android:textColor="@color/text_dim"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
             <TextView
                 android:id="@+id/filterTracks"
@@ -255,13 +300,13 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:focusable="true"
-                android:nextFocusLeft="@id/miniPlay"
+                android:nextFocusDown="@id/list"
                 android:fontFamily="sans-serif-medium"
                 android:foreground="@drawable/bg_focus_ring"
                 android:gravity="center"
                 android:text="@string/filter_tracks"
                 android:textColor="@color/text_dim"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
         </LinearLayout>
 
         <TextView
@@ -290,6 +335,7 @@
                 android:dividerHeight="0dp"
                 android:drawSelectorOnTop="true"
                 android:listSelector="@drawable/bg_row_focus"
+                android:nextFocusUp="@id/filterAll"
                 android:paddingBottom="10dp"
                 android:scrollbars="none" />
 

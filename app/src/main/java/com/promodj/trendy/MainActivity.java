@@ -2,6 +2,7 @@ package com.promodj.trendy;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.DownloadManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -9,12 +10,15 @@ import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -74,6 +78,8 @@ public class MainActivity extends Activity implements PlayerService.Listener {
     private boolean panelMode;
     private SeekBar panelSeek;
     private boolean panelSeeking;
+    private TextView panelCache;
+    private TextView panelDownload;
 
     private PlayerService service;
     private boolean bound;
@@ -121,13 +127,21 @@ public class MainActivity extends Activity implements PlayerService.Listener {
             new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-            if (!fromUser || service == null || miniTimeCurrent == null) {
+            if (!fromUser || service == null) {
                 return;
             }
             int duration = service.getDuration();
-            if (duration > 0) {
-                int position = (int) (duration * (progress / 1000.0));
+            if (duration <= 0) {
+                return;
+            }
+            int position = (int) (duration * (progress / 1000.0));
+            if (miniTimeCurrent != null) {
                 miniTimeCurrent.setText(Ui.formatTime(position / 1000));
+            }
+            // Стрелки пульта меняют прогресс без onStartTrackingTouch, поэтому
+            // перематываем сразу. При касании ждём onStopTrackingTouch.
+            if (!panelSeeking) {
+                service.seekTo(position);
             }
         }
 
@@ -185,7 +199,56 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         if (miniProgress instanceof SeekBar) {
             panelSeek = (SeekBar) miniProgress;
             panelSeek.setOnSeekBarChangeListener(seekListener);
+            panelSeek.setOnKeyListener(new View.OnKeyListener() {
+                @Override
+                public boolean onKey(View view, int keyCode, KeyEvent event) {
+                    if (event.getAction() != KeyEvent.ACTION_DOWN) {
+                        return false;
+                    }
+                    // Перемотка стрелками: не полагаемся на поведение SeekBar
+                    // на ТВ-приставках, где стрелки иногда уходят в навигацию.
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT
+                            || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        if (service == null) {
+                            return false;
+                        }
+                        int duration = service.getDuration();
+                        if (duration <= 0) {
+                            return true;
+                        }
+                        int step = 5000;
+                        int target = service.getPosition()
+                                + (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? step : -step);
+                        target = Math.max(0, Math.min(duration, target));
+                        service.seekTo(target);
+                        if (miniProgress != null) {
+                            miniProgress.setProgress((int) Math.min(1000L,
+                                    Math.round(target * 1000.0 / duration)));
+                        }
+                        if (miniTimeCurrent != null) {
+                            miniTimeCurrent.setText(Ui.formatTime(target / 1000));
+                        }
+                        return true;
+                    }
+                    // Иначе SeekBar съедает вверх/вниз и с перемотки не уйти.
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                        View info = findViewById(R.id.miniInfo);
+                        if (info != null) {
+                            info.requestFocus();
+                            return true;
+                        }
+                    } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                        if (miniPlay != null) {
+                            miniPlay.requestFocus();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            });
         }
+        panelCache = (TextView) findViewById(R.id.panelCache);
+        panelDownload = (TextView) findViewById(R.id.panelDownload);
 
         listView.setAdapter(adapter);
         listView.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
@@ -261,8 +324,40 @@ public class MainActivity extends Activity implements PlayerService.Listener {
                 }
             });
         }
+        if (panelCache != null) {
+            panelCache.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    cacheCurrent();
+                }
+            });
+        }
+        if (panelDownload != null) {
+            panelDownload.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    downloadCurrent();
+                }
+            });
+        }
         if (panelMode) {
             sizePanelCover();
+            // С верхней строки списка вверх — сразу на фильтры: так до них
+            // можно добраться пультом, не проходя через строку жанров.
+            listView.setOnKeyListener(new View.OnKeyListener() {
+                @Override
+                public boolean onKey(View view, int keyCode, KeyEvent event) {
+                    if (event.getAction() != KeyEvent.ACTION_DOWN
+                            || keyCode != KeyEvent.KEYCODE_DPAD_UP) {
+                        return false;
+                    }
+                    if (listView.getSelectedItemPosition() <= 0 && filterChips != null) {
+                        filterChips[0].requestFocus();
+                        return true;
+                    }
+                    return false;
+                }
+            });
         }
 
         loadFeed();
@@ -429,9 +524,10 @@ public class MainActivity extends Activity implements PlayerService.Listener {
             chip.setFocusable(true);
             chip.setBackgroundResource(R.drawable.bg_genre_chip);
             chip.setTextColor(getColorStateList(R.color.genre_chip_text));
+            chip.setId(View.generateViewId());
             if (panelMode) {
-                // Пультом: влево от жанров — к постоянному плееру.
-                chip.setNextFocusLeftId(R.id.miniPlay);
+                // Пультом: вниз от жанров — на строку фильтров.
+                chip.setNextFocusDownId(R.id.filterAll);
             }
             chip.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             chip.setPadding(horizontal, 0, horizontal, 0);
@@ -524,6 +620,13 @@ public class MainActivity extends Activity implements PlayerService.Listener {
             chip.setTypeface(Typeface.create("sans-serif",
                     selected ? Typeface.BOLD : Typeface.NORMAL));
         }
+        // Пультом: вверх с фильтров — к выбранному жанру.
+        if (panelMode && filterChips != null && filterChips[0] != null) {
+            int selected = indexOfGenre(genre);
+            if (selected >= 0) {
+                filterChips[0].setNextFocusUpId(genreChips[selected].getId());
+            }
+        }
     }
 
     private void buildFilterChips() {
@@ -533,6 +636,12 @@ public class MainActivity extends Activity implements PlayerService.Listener {
                 (TextView) findViewById(R.id.filterTracks)
         };
         for (int i = 0; i < filterChips.length; i++) {
+            if (panelMode) {
+                filterChips[i].setBackgroundResource(R.drawable.bg_filter_tab);
+                filterChips[i].setTextColor(getColorStateList(R.color.filter_tab_text));
+                // Кольцо фокуса уже есть в state-list — второе не нужно.
+                filterChips[i].setForeground(null);
+            }
             final int value = i;
             filterChips[i].setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -554,9 +663,17 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         }
         for (int i = 0; i < filterChips.length; i++) {
             boolean selected = filter == i;
-            filterChips[i].setBackgroundResource(selected ? R.drawable.bg_filter_selected : 0);
-            filterChips[i].setTextColor(getColor(selected
-                    ? R.color.accent : R.color.text_dim));
+            if (panelMode) {
+                // В ландшафте фон/цвет задаёт state-list bg_filter_tab.
+                filterChips[i].setSelected(selected);
+                filterChips[i].setTypeface(Typeface.create("sans-serif",
+                        selected ? Typeface.BOLD : Typeface.NORMAL));
+            } else {
+                filterChips[i].setBackgroundResource(
+                        selected ? R.drawable.bg_filter_selected : 0);
+                filterChips[i].setTextColor(getColor(selected
+                        ? R.color.accent : R.color.text_dim));
+            }
         }
     }
 
@@ -570,6 +687,7 @@ public class MainActivity extends Activity implements PlayerService.Listener {
             } else if (miniPlayer != null) {
                 miniPlayer.setVisibility(View.GONE);
             }
+            updatePanelButtons(null);
             return;
         }
         if (miniPlayer != null) {
@@ -583,6 +701,124 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         miniPlay.setImageResource(pauseIcon
                 ? R.drawable.ic_pause_white : R.drawable.ic_play_white);
         miniPlay.setContentDescription(getString(pauseIcon ? R.string.pause : R.string.play));
+        updatePanelButtons(track);
+    }
+
+    /** Состояние кнопок «В кэш» и «Скачать» на панели. */
+    private void updatePanelButtons(Track track) {
+        if (panelCache == null) {
+            return;
+        }
+        if (track == null) {
+            panelCache.setText(R.string.cache);
+            panelCache.setAlpha(1f);
+            panelCache.setEnabled(false);
+            if (panelDownload != null) {
+                panelDownload.setEnabled(false);
+            }
+            return;
+        }
+        panelCache.setEnabled(true);
+        if (panelDownload != null) {
+            panelDownload.setEnabled(true);
+        }
+        boolean cached = AudioCache.isCached(this, track.id);
+        boolean downloading = AudioCache.isDownloading(track.id);
+        if (cached) {
+            panelCache.setText(R.string.cached);
+            panelCache.setAlpha(0.72f);
+        } else if (downloading) {
+            panelCache.setText(R.string.caching);
+            panelCache.setAlpha(1f);
+        } else {
+            panelCache.setText(R.string.cache);
+            panelCache.setAlpha(1f);
+        }
+        panelCache.setContentDescription(getString(
+                cached ? R.string.cached : R.string.cache));
+    }
+
+    private void cacheCurrent() {
+        if (service == null || service.getCurrent() == null) {
+            return;
+        }
+        final Track track = service.getCurrent();
+        if (AudioCache.isCached(this, track.id)) {
+            Toast.makeText(this, R.string.cache_already, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (AudioCache.isDownloading(track.id)) {
+            Toast.makeText(this, R.string.cache_downloading, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if ((track.streamUrl == null || track.streamUrl.length() == 0)
+                && (track.downloadUrl == null || track.downloadUrl.length() == 0)) {
+            Toast.makeText(this, R.string.cache_unavailable, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        boolean started = AudioCache.download(this, track, new AudioCache.Listener() {
+            @Override
+            public void onCacheFinished(final long trackId, final boolean success) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isFinishing()) {
+                            return;
+                        }
+                        refreshMiniPlayer();
+                        if (adapter != null) {
+                            adapter.notifyDataSetChanged();
+                        }
+                        Toast.makeText(MainActivity.this,
+                                success ? R.string.cache_done : R.string.cache_failed,
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+        if (started) {
+            Toast.makeText(this, R.string.cache_started, Toast.LENGTH_SHORT).show();
+        }
+        refreshMiniPlayer();
+    }
+
+    private void downloadCurrent() {
+        if (service == null || service.getCurrent() == null) {
+            return;
+        }
+        Track track = service.getCurrent();
+        if (track.downloadUrl == null || track.downloadUrl.length() == 0) {
+            Toast.makeText(this, R.string.download_unavailable, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            if (manager == null) {
+                Toast.makeText(this, R.string.download_unavailable, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String name = Ui.safeFileName(track.artist.length() > 0
+                    ? track.artist + " - " + track.title : track.title) + ".mp3";
+            DownloadManager.Request request = new DownloadManager.Request(
+                    Uri.parse(track.downloadUrl));
+            request.setTitle(track.title);
+            request.setDescription(track.artist.length() > 0
+                    ? track.artist : getString(R.string.notification_album));
+            request.setMimeType("audio/mpeg");
+            request.setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            if (Build.VERSION.SDK_INT >= 29) {
+                request.setDestinationInExternalPublicDir(
+                        Environment.DIRECTORY_DOWNLOADS, name);
+            } else {
+                request.setDestinationInExternalFilesDir(
+                        this, Environment.DIRECTORY_MUSIC, name);
+            }
+            manager.enqueue(request);
+            Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show();
+        } catch (Exception error) {
+            Toast.makeText(this, R.string.download_unavailable, Toast.LENGTH_SHORT).show();
+        }
     }
 
     /** В ландшафте левая панель видна всегда, даже без трека. */
@@ -620,11 +856,18 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         box.post(new Runnable() {
             @Override
             public void run() {
-                if (isFinishing() || box.getWidth() == 0 || box.getHeight() == 0) {
+                if (isFinishing() || box.getWidth() == 0) {
                     return;
                 }
-                int size = Math.min(box.getWidth(), box.getHeight());
-                size = Math.max(Ui.dp(MainActivity.this, 120), size);
+                int height = box.getHeight();
+                // На низком экране (телефон в ландшафте) обложке не остаётся
+                // места — прячем её, иначе от неё остаётся полоска.
+                if (height < Ui.dp(MainActivity.this, 88)) {
+                    miniCover.setVisibility(View.GONE);
+                    return;
+                }
+                int size = Math.min(box.getWidth(), height);
+                miniCover.setVisibility(View.VISIBLE);
                 android.view.ViewGroup.LayoutParams params = miniCover.getLayoutParams();
                 params.width = size;
                 params.height = size;
