@@ -57,6 +57,16 @@ AndroidX, no third-party dependencies, and Russian UI text.
   Keep interactive views `focusable` with the `bg_focus_*` foregrounds and the ListView
   `bg_row_focus` selector so D-pad/remote focus stays visible. Don't re-add
   `android:screenOrientation="portrait"`.
+- `layout-land/activity_main.xml` is a two-pane screen: `@id/playerPanel` on the left with the
+  mini-player ids (`miniCover`, `miniTitle`, `miniArtist`, `miniProgress` as SeekBar,
+  `miniPrev`, `miniPlay`, `miniNext`), list and filters on the right. `MainActivity` detects it
+  via `findViewById(R.id.playerPanel) != null` (`panelMode`) and keeps the panel visible
+  without a track. Portrait keeps `view_mini_player.xml`; never assume `miniPlayer` exists.
+- D-pad reachability is explicit: list and filter chips set `nextFocusLeft` to `@id/miniPlay`,
+  `miniPlay` sets `nextFocusRight` to `@id/list`, and genre chips get
+  `setNextFocusLeftId(R.id.miniPlay)` in panel mode. Genre chips use the `bg_genre_chip`
+  state-list (selected/focused) plus `color/genre_chip_text`; `setForeground` rings do not
+  work for programmatically created chips.
 - `PromoDjApi` scrapes `https://promodj.com/trendy/<genre>[/<filter>]` HTML with the
   `TRACK_LINK` regex, then enriches tracks in batches of 20 via `POST /api/multi.json`
   (`players/config`). There is no API key. If the feed breaks, inspect the current PromoDJ

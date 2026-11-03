@@ -28,6 +28,7 @@
     <string name="channel_description">Плеер PromoDJ Trendy</string>
     <string name="notification_album">PromoDJ Trendy</string>
     <string name="loading">Загрузка…</string>
+    <string name="nothing_playing">Ничего не играет</string>
     <string name="cache">В кэш</string>
     <string name="cached">В кэше</string>
     <string name="caching">Загрузка…</string>

@@ -23,6 +23,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -66,6 +67,13 @@ public class MainActivity extends Activity implements PlayerService.Listener {
     private ImageButton miniPlay;
     private ProgressBar miniProgress;
     private ImageButton refreshButton;
+    private TextView miniTimeCurrent;
+    private TextView miniTimeTotal;
+
+    /** Ландшафт: постоянный плеер слева, список справа. */
+    private boolean panelMode;
+    private SeekBar panelSeek;
+    private boolean panelSeeking;
 
     private PlayerService service;
     private boolean bound;
@@ -109,6 +117,38 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         }
     };
 
+    private final SeekBar.OnSeekBarChangeListener seekListener =
+            new SeekBar.OnSeekBarChangeListener() {
+        @Override
+        public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+            if (!fromUser || service == null || miniTimeCurrent == null) {
+                return;
+            }
+            int duration = service.getDuration();
+            if (duration > 0) {
+                int position = (int) (duration * (progress / 1000.0));
+                miniTimeCurrent.setText(Ui.formatTime(position / 1000));
+            }
+        }
+
+        @Override
+        public void onStartTrackingTouch(SeekBar bar) {
+            panelSeeking = true;
+        }
+
+        @Override
+        public void onStopTrackingTouch(SeekBar bar) {
+            panelSeeking = false;
+            if (service == null) {
+                return;
+            }
+            int duration = service.getDuration();
+            if (duration > 0) {
+                service.seekTo((int) (duration * (bar.getProgress() / 1000.0)));
+            }
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -134,11 +174,18 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         refreshButton = (ImageButton) findViewById(R.id.refresh);
 
         miniPlayer = findViewById(R.id.miniPlayer);
+        panelMode = findViewById(R.id.playerPanel) != null;
         miniCover = (RoundedImageView) findViewById(R.id.miniCover);
         miniTitle = (TextView) findViewById(R.id.miniTitle);
         miniArtist = (TextView) findViewById(R.id.miniArtist);
         miniPlay = (ImageButton) findViewById(R.id.miniPlay);
         miniProgress = (ProgressBar) findViewById(R.id.miniProgress);
+        miniTimeCurrent = (TextView) findViewById(R.id.miniTimeCurrent);
+        miniTimeTotal = (TextView) findViewById(R.id.miniTimeTotal);
+        if (miniProgress instanceof SeekBar) {
+            panelSeek = (SeekBar) miniProgress;
+            panelSeek.setOnSeekBarChangeListener(seekListener);
+        }
 
         listView.setAdapter(adapter);
         listView.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
@@ -192,12 +239,31 @@ public class MainActivity extends Activity implements PlayerService.Listener {
                 }
             }
         });
-        findViewById(R.id.miniInfo).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                openPlayer();
-            }
-        });
+        View miniPrev = findViewById(R.id.miniPrev);
+        if (miniPrev != null) {
+            miniPrev.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if (service != null) {
+                        service.previous();
+                    } else {
+                        PlayerService.command(MainActivity.this, PlayerService.ACTION_PREV);
+                    }
+                }
+            });
+        }
+        View miniInfo = findViewById(R.id.miniInfo);
+        if (miniInfo != null) {
+            miniInfo.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    openPlayer();
+                }
+            });
+        }
+        if (panelMode) {
+            sizePanelCover();
+        }
 
         loadFeed();
         requestNotificationPermission();
@@ -350,17 +416,23 @@ public class MainActivity extends Activity implements PlayerService.Listener {
     private void buildGenreChips() {
         genreRow.removeAllViews();
         genreChips = new TextView[GENRE_KEYS.length];
-        int height = Ui.dp(this, 36);
-        int horizontal = Ui.dp(this, 15);
+        // На ТВ и в ландшафте чипы крупнее: выделение видно с дивана.
+        int height = Ui.dp(this, panelMode ? 46 : 36);
+        int horizontal = Ui.dp(this, panelMode ? 20 : 15);
         for (int i = 0; i < GENRE_KEYS.length; i++) {
             final int position = i;
             TextView chip = new TextView(this);
             chip.setText(GENRE_NAMES[i]);
-            chip.setTextSize(12f);
+            chip.setTextSize(panelMode ? 14f : 12f);
             chip.setGravity(Gravity.CENTER);
             chip.setSingleLine(true);
             chip.setFocusable(true);
-            chip.setForeground(getDrawable(R.drawable.bg_focus_ring));
+            chip.setBackgroundResource(R.drawable.bg_genre_chip);
+            chip.setTextColor(getColorStateList(R.color.genre_chip_text));
+            if (panelMode) {
+                // Пультом: влево от жанров — к постоянному плееру.
+                chip.setNextFocusLeftId(R.id.miniPlay);
+            }
             chip.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             chip.setPadding(horizontal, 0, horizontal, 0);
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -381,28 +453,62 @@ public class MainActivity extends Activity implements PlayerService.Listener {
             chip.setOnFocusChangeListener(new View.OnFocusChangeListener() {
                 @Override
                 public void onFocusChange(View view, boolean hasFocus) {
-                    if (!hasFocus) {
+                    if (hasFocus) {
+                        scrollChipIntoView(chip, false);
                         return;
                     }
-                    if (genreRow.getParent() instanceof HorizontalScrollView) {
-                        ((HorizontalScrollView) genreRow.getParent()).smoothScrollTo(
-                                Math.max(0, chip.getLeft() - Ui.dp(MainActivity.this, 16)), 0);
-                    }
+                    // Фокус ушёл из строки жанров — возвращаем выбранный жанр в кадр,
+                    // иначе на ТВ не видно, какой жанр включён.
+                    genreRow.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (genreRow.findFocus() != null) {
+                                return;
+                            }
+                            int index = indexOfGenre(genre);
+                            if (index >= 0) {
+                                scrollChipIntoView(genreChips[index], true);
+                            }
+                        }
+                    });
                 }
             });
             genreRow.addView(chip);
             genreChips[i] = chip;
         }
-        final HorizontalScrollView scroll = (HorizontalScrollView) genreRow.getParent();
         final int selected = Math.max(0, indexOfGenre(genre));
-        scroll.post(new Runnable() {
+        genreRow.post(new Runnable() {
             @Override
             public void run() {
-                TextView chip = genreChips[selected];
-                scroll.smoothScrollTo(Math.max(0,
-                        chip.getLeft() - Ui.dp(MainActivity.this, 16)), 0);
+                scrollChipIntoView(genreChips[selected], true);
             }
         });
+    }
+
+    /**
+     * Прокручивает строку жанров ровно настолько, чтобы чип был виден.
+     * center=true центрирует чип (возврат к выбранному жанру).
+     */
+    private void scrollChipIntoView(View chip, boolean center) {
+        if (chip == null || !(genreRow.getParent() instanceof HorizontalScrollView)) {
+            return;
+        }
+        HorizontalScrollView scroll = (HorizontalScrollView) genreRow.getParent();
+        int width = scroll.getWidth();
+        if (width <= 0 || chip.getWidth() <= 0) {
+            return;
+        }
+        int padding = Ui.dp(this, 20);
+        int x = scroll.getScrollX();
+        int left = chip.getLeft();
+        int right = chip.getRight();
+        if (center) {
+            scroll.smoothScrollTo(Math.max(0, left - (width - chip.getWidth()) / 2), 0);
+        } else if (left - padding < x) {
+            scroll.smoothScrollTo(Math.max(0, left - padding), 0);
+        } else if (right + padding > x + width) {
+            scroll.smoothScrollTo(Math.max(0, right + padding - width), 0);
+        }
     }
 
     private void applyGenreStyles() {
@@ -412,9 +518,11 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         for (int i = 0; i < genreChips.length; i++) {
             boolean selected = GENRE_KEYS[i].equals(genre);
             TextView chip = genreChips[i];
-            chip.setBackgroundResource(selected
-                    ? R.drawable.bg_chip_selected : R.drawable.bg_chip);
-            chip.setTextColor(getColor(selected ? R.color.white : R.color.text_dim));
+            // Фон и цвет текста — state-list в bg_genre_chip / genre_chip_text.
+            chip.setSelected(selected);
+            // Жирный шрифт дублирует цвет: на ТВ выделение видно и без оттенка.
+            chip.setTypeface(Typeface.create("sans-serif",
+                    selected ? Typeface.BOLD : Typeface.NORMAL));
         }
     }
 
@@ -455,12 +563,18 @@ public class MainActivity extends Activity implements PlayerService.Listener {
     // ---------------------------------------------------------------- player
 
     private void refreshMiniPlayer() {
-        if (service == null || service.getCurrent() == null) {
-            miniPlayer.setVisibility(View.GONE);
+        Track track = service == null ? null : service.getCurrent();
+        if (track == null) {
+            if (panelMode) {
+                showPanelPlaceholder();
+            } else if (miniPlayer != null) {
+                miniPlayer.setVisibility(View.GONE);
+            }
             return;
         }
-        Track track = service.getCurrent();
-        miniPlayer.setVisibility(View.VISIBLE);
+        if (miniPlayer != null) {
+            miniPlayer.setVisibility(View.VISIBLE);
+        }
         miniTitle.setText(track.title);
         miniArtist.setText(track.artist.length() > 0 ? track.artist : track.kindLabel());
         ImageLoader.get(this).load(track.coverUrl, miniCover);
@@ -469,6 +583,54 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         miniPlay.setImageResource(pauseIcon
                 ? R.drawable.ic_pause_white : R.drawable.ic_play_white);
         miniPlay.setContentDescription(getString(pauseIcon ? R.string.pause : R.string.play));
+    }
+
+    /** В ландшафте левая панель видна всегда, даже без трека. */
+    private void showPanelPlaceholder() {
+        if (miniTitle != null) {
+            miniTitle.setText(R.string.nothing_playing);
+        }
+        if (miniArtist != null) {
+            miniArtist.setText("");
+        }
+        if (miniCover != null) {
+            miniCover.setImageResource(R.drawable.ic_cover_placeholder);
+        }
+        if (miniPlay != null) {
+            miniPlay.setImageResource(R.drawable.ic_play_white);
+            miniPlay.setContentDescription(getString(R.string.play));
+        }
+        if (miniProgress != null) {
+            miniProgress.setProgress(0);
+        }
+        if (miniTimeCurrent != null) {
+            miniTimeCurrent.setText(Ui.formatTime(0));
+        }
+        if (miniTimeTotal != null) {
+            miniTimeTotal.setText(Ui.formatTime(0));
+        }
+    }
+
+    /** Обложка панели — квадрат по меньшей стороне свободного места. */
+    private void sizePanelCover() {
+        final View box = findViewById(R.id.coverBox);
+        if (box == null || miniCover == null) {
+            return;
+        }
+        box.post(new Runnable() {
+            @Override
+            public void run() {
+                if (isFinishing() || box.getWidth() == 0 || box.getHeight() == 0) {
+                    return;
+                }
+                int size = Math.min(box.getWidth(), box.getHeight());
+                size = Math.max(Ui.dp(MainActivity.this, 120), size);
+                android.view.ViewGroup.LayoutParams params = miniCover.getLayoutParams();
+                params.width = size;
+                params.height = size;
+                miniCover.setLayoutParams(params);
+            }
+        });
     }
 
     private void updateHighlight() {
@@ -485,9 +647,17 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         }
         int duration = service.getDuration();
         int position = service.getPosition();
-        int value = duration > 0
-                ? (int) Math.min(1000L, Math.round(position * 1000.0 / duration)) : 0;
-        miniProgress.setProgress(value);
+        if (miniProgress != null && !panelSeeking) {
+            int value = duration > 0
+                    ? (int) Math.min(1000L, Math.round(position * 1000.0 / duration)) : 0;
+            miniProgress.setProgress(value);
+            if (miniTimeCurrent != null) {
+                miniTimeCurrent.setText(Ui.formatTime(position / 1000));
+            }
+        }
+        if (miniTimeTotal != null) {
+            miniTimeTotal.setText(Ui.formatTime(duration / 1000));
+        }
     }
 
     private void openPlayer() {
