@@ -276,6 +276,15 @@ public class MainActivity extends Activity implements PlayerService.Listener {
                 loadFeed();
             }
         });
+        View settingsButton = findViewById(R.id.settings);
+        if (settingsButton != null) {
+            settingsButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    startActivity(new Intent(MainActivity.this, SettingsActivity.class));
+                }
+            });
+        }
 
         buildGenreChips();
         buildFilterChips();
@@ -722,7 +731,7 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         if (panelDownload != null) {
             panelDownload.setEnabled(true);
         }
-        boolean cached = AudioCache.isCached(this, track.id);
+        boolean cached = AudioCache.isSaved(this, track.id);
         boolean downloading = AudioCache.isDownloading(track.id);
         if (cached) {
             panelCache.setText(R.string.cached);
@@ -743,7 +752,7 @@ public class MainActivity extends Activity implements PlayerService.Listener {
             return;
         }
         final Track track = service.getCurrent();
-        if (AudioCache.isCached(this, track.id)) {
+        if (AudioCache.isSaved(this, track.id)) {
             Toast.makeText(this, R.string.cache_already, Toast.LENGTH_SHORT).show();
             return;
         }

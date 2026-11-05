@@ -43,6 +43,16 @@ public class PlayerService extends Service {
     private static final int NOTIFICATION_ID = 4242;
     /** Ограничение обложки для Binder: Notification/MediaMetadata идут в SystemUI. */
     private static final int ARTWORK_MAX = 512;
+    /** Повторы одного и того же сетевого URL перед переходом к следующему треку. */
+    private static final int MAX_NETWORK_RETRIES = 2;
+    private static final long NETWORK_RETRY_DELAY_MS = 1200L;
+    /** PlaybackState для системных элементов обновляем примерно раз в секунду. */
+    private static final long SESSION_UPDATE_INTERVAL_MS = 1000L;
+
+    private static final int FOCUS_NONE = 0;
+    private static final int FOCUS_GRANTED = 1;
+    private static final int FOCUS_LOST_TRANSIENT = 2;
+    private static final int FOCUS_DUCKED = 3;
 
     public static final String ACTION_PLAY_QUEUE = "com.promodj.trendy.action.PLAY_QUEUE";
     public static final String ACTION_TOGGLE = "com.promodj.trendy.action.TOGGLE";
@@ -86,8 +96,11 @@ public class PlayerService extends Service {
     private boolean playingFromCache;
     private volatile int playSerial;
     private int consecutiveErrors;
+    private int networkRetries;
     private String lastError = "";
     private int errorSerial;
+    private int focusState = FOCUS_NONE;
+    private boolean ducked;
 
     private MediaPlayer player;
     private boolean playerPrepared;
@@ -100,6 +113,23 @@ public class PlayerService extends Service {
     private volatile boolean destroyed;
     private Bitmap currentArtwork;
     private NotificationManager notificationManager;
+
+    /**
+     * Пока играет музыка, позиция в MediaSession должна «идти»: системный
+     * пульт и Android Auto читают её из PlaybackState, а не из MediaPlayer.
+     */
+    private final Runnable sessionTicker = new Runnable() {
+        @Override
+        public void run() {
+            if (destroyed) {
+                return;
+            }
+            if (state == STATE_PLAYING) {
+                updatePlaybackState();
+                main.postDelayed(this, SESSION_UPDATE_INTERVAL_MS);
+            }
+        }
+    };
 
     public static void play(Context context, ArrayList<Track> tracks, int position) {
         Intent intent = new Intent(context, PlayerService.class);
@@ -186,6 +216,7 @@ public class PlayerService extends Service {
     public void onDestroy() {
         destroyed = true;
         playSerial++;
+        main.removeCallbacks(sessionTicker);
         releasePlayer();
         try {
             unregisterReceiver(noisyReceiver);
@@ -217,20 +248,42 @@ public class PlayerService extends Service {
         pendingSeekMs = -1;
         currentArtwork = null;
         lastError = "";
+        networkRetries = 0;
         int serial = ++playSerial;
         releasePlayer();
+
+        // Без аудиофокуса не начинаем: иначе музыка зазвучит поверх
+        // навигатора или звонка.
+        if (!requestAudioFocus()) {
+            focusState = FOCUS_NONE;
+            lastError = getString(R.string.audio_focus_denied);
+            errorSerial++;
+            state = STATE_ERROR;
+            if (session != null) {
+                session.setActive(true);
+            }
+            updateSessionMetadata(current, null);
+            updatePlaybackState();
+            if (foreground) {
+                // Не оставляем в уведомлении предыдущий трек.
+                updateNotification();
+            }
+            notifyListeners();
+            return;
+        }
+
         setState(STATE_BUFFERING);
         if (session != null) {
             session.setActive(true);
         }
         updateSessionMetadata(current, null);
         loadArtwork(current);
-        requestAudioFocus();
 
         final Track track = current;
         if (AudioCache.isCached(this, track.id)) {
             playingFromCache = true;
-            preparePlayer(AudioCache.file(this, track.id).getAbsolutePath(), track, true, true);
+            preparePlayer(AudioCache.file(this, track.id).getAbsolutePath(),
+                    track, true, true, serial);
         } else {
             playingFromCache = false;
             resolveAndPlay(track, serial);
@@ -254,16 +307,16 @@ public class PlayerService extends Service {
                             return;
                         }
                         playingFromCache = false;
-                        preparePlayer(resolved, track, false, false);
+                        preparePlayer(resolved, track, false, false, serial);
                     }
                 });
             }
         });
     }
 
-    private void preparePlayer(String url, Track track, boolean fallbackUsed,
-                               boolean fromCache) {
-        if (destroyed) {
+    private void preparePlayer(final String url, final Track track, final boolean fallbackUsed,
+                               final boolean fromCache, final int serial) {
+        if (destroyed || serial != playSerial) {
             return;
         }
         releasePlayer();
@@ -279,15 +332,17 @@ public class PlayerService extends Service {
             mp.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 @Override
                 public void onPrepared(MediaPlayer mediaPlayer) {
-                    if (mediaPlayer != player) {
+                    if (mediaPlayer != player || serial != playSerial) {
                         return;
                     }
                     playerPrepared = true;
                     consecutiveErrors = 0;
+                    networkRetries = 0;
                     if (pendingSeekMs >= 0) {
                         mediaPlayer.seekTo(pendingSeekMs);
                         pendingSeekMs = -1;
                     }
+                    applyVolume();
                     mediaPlayer.start();
                     setState(STATE_PLAYING);
                 }
@@ -298,22 +353,21 @@ public class PlayerService extends Service {
                     if (mediaPlayer != player) {
                         return;
                     }
-                    if (index < queue.size() - 1) {
-                        final int serial = playSerial;
-                        final int nextIndex = index + 1;
-                        // Не освобождаем MediaPlayer изнутри его callback.
-                        main.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (!destroyed && serial == playSerial
-                                        && state == STATE_PLAYING) {
-                                    playAt(nextIndex);
-                                }
+                    // Не освобождаем MediaPlayer изнутри его callback.
+                    main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (destroyed || serial != playSerial
+                                    || state != STATE_PLAYING) {
+                                return;
                             }
-                        });
-                    } else {
-                        setState(STATE_ENDED);
-                    }
+                            if (index < queue.size() - 1) {
+                                playAt(index + 1);
+                            } else {
+                                endQueue();
+                            }
+                        }
+                    });
                 }
             });
             mp.setOnErrorListener(new MediaPlayer.OnErrorListener() {
@@ -322,33 +376,16 @@ public class PlayerService extends Service {
                     if (mediaPlayer != player) {
                         return true;
                     }
-                    final String fallback = track.streamUrl == null ? "" : track.streamUrl;
-                    if (fromCache) {
-                        // Битый кэш: удаляем его и возвращаемся к сети.
-                        AudioCache.delete(PlayerService.this, track.id);
-                        main.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (!destroyed && mediaPlayer == player) {
-                                    playingFromCache = false;
-                                    resolveAndPlay(track, playSerial);
-                                }
+                    // Обработку и повторные попытки делаем вне callback плеера.
+                    main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (destroyed || serial != playSerial) {
+                                return;
                             }
-                        });
-                    } else if (!fallbackUsed && url != null && !url.equals(fallback)) {
-                        // Не освобождаем MediaPlayer изнутри его же onError:
-                        // откладываем повторную попытку на следующий цикл main.
-                        main.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (!destroyed && mediaPlayer == player) {
-                                    preparePlayer(fallback, track, true, false);
-                                }
-                            }
-                        });
-                    } else {
-                        handlePlaybackError();
-                    }
+                            handleSourceError(track, url, fallbackUsed, fromCache);
+                        }
+                    });
                     return true;
                 }
             });
@@ -361,17 +398,52 @@ public class PlayerService extends Service {
             mp.prepareAsync();
         } catch (Exception error) {
             Log.w(TAG, "prepare failed", error);
-            String fallback = track.streamUrl == null ? "" : track.streamUrl;
-            if (fromCache) {
-                AudioCache.delete(this, track.id);
-                playingFromCache = false;
-                resolveAndPlay(track, playSerial);
-            } else if (!fallbackUsed && url != null && !url.equals(fallback)) {
-                preparePlayer(fallback, track, true, false);
-            } else {
-                handlePlaybackError();
+            if (destroyed || serial != playSerial) {
+                return;
             }
+            handleSourceError(track, url, fallbackUsed, fromCache);
         }
+    }
+
+    /**
+     * Единая точка обработки сбоя источника: битый кэш → сеть, запасной URL,
+     * затем ограниченные повторы с задержкой.
+     */
+    private void handleSourceError(final Track track, final String url,
+                                   final boolean fallbackUsed, final boolean fromCache) {
+        if (destroyed) {
+            return;
+        }
+        if (fromCache) {
+            // Сохранённый пользователем файл не удаляем: чистим только
+            // временную копию и пробуем сеть.
+            AudioCache.deleteTemp(this, track.id);
+            playingFromCache = false;
+            releasePlayer();
+            resolveAndPlay(track, playSerial);
+            return;
+        }
+        String fallback = track.streamUrl == null ? "" : track.streamUrl;
+        if (!fallbackUsed && url != null && fallback.length() > 0
+                && !url.equals(fallback)) {
+            preparePlayer(fallback, track, true, false, playSerial);
+            return;
+        }
+        if (networkRetries < MAX_NETWORK_RETRIES) {
+            networkRetries++;
+            setState(STATE_BUFFERING);
+            final int serial = playSerial;
+            main.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (!destroyed && serial == playSerial) {
+                        preparePlayer(url, track, fallbackUsed, false, serial);
+                    }
+                }
+            }, NETWORK_RETRY_DELAY_MS);
+            return;
+        }
+        handlePlaybackError();
     }
 
     private void handlePlaybackError() {
@@ -380,18 +452,36 @@ public class PlayerService extends Service {
         }
         consecutiveErrors++;
         errorSerial++;
-        lastError = "Не удалось воспроизвести трек";
-        setState(STATE_ERROR);
-        if (queue.size() > 1 && consecutiveErrors <= 2) {
+        networkRetries = 0;
+        lastError = getString(R.string.error_playback);
+        boolean canAdvance = queue.size() > 1 && consecutiveErrors <= 2
+                && index < queue.size() - 1;
+        releasePlayer();
+        if (canAdvance) {
+            setState(STATE_ERROR);
+            final int serial = playSerial;
             main.postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    if (!destroyed && state == STATE_ERROR) {
+                    if (!destroyed && state == STATE_ERROR && serial == playSerial) {
                         next(false);
                     }
                 }
             }, 1800);
+        } else {
+            // Терминальная ошибка: ресурсы и фокус больше не нужны.
+            ducked = false;
+            abandonAudioFocus();
+            setState(STATE_ERROR);
         }
+    }
+
+    private void endQueue() {
+        ducked = false;
+        resumeOnFocusGain = false;
+        applyVolume();
+        abandonAudioFocus();
+        setState(STATE_ENDED);
     }
 
     private void releasePlayer() {
@@ -440,6 +530,9 @@ public class PlayerService extends Service {
             setState(STATE_PAUSED);
         }
         if (abandonFocus) {
+            // Пользователь сам поставил паузу — после возврата фокуса
+            // возобновлять не нужно.
+            resumeOnFocusGain = false;
             abandonAudioFocus();
         }
     }
@@ -448,13 +541,28 @@ public class PlayerService extends Service {
         if (current == null) {
             return;
         }
-        if (state == STATE_ENDED || state == STATE_ERROR || player == null || !playerPrepared) {
-            consecutiveErrors = 0;
-            playAt(index);
+        if (!requestAudioFocus()) {
+            lastError = getString(R.string.audio_focus_denied);
+            errorSerial++;
+            setState(STATE_ERROR);
             return;
         }
-        requestAudioFocus();
+        startPlayback();
+    }
+
+    /** Запуск с уже полученным аудиофокусом (в т.ч. после AUDIOFOCUS_GAIN). */
+    private void startPlayback() {
+        if (current == null) {
+            return;
+        }
+        if (state == STATE_ENDED || state == STATE_ERROR
+                || player == null || !playerPrepared) {
+            consecutiveErrors = 0;
+            playAt(index < 0 ? 0 : index);
+            return;
+        }
         try {
+            applyVolume();
             player.start();
             setState(STATE_PLAYING);
         } catch (Exception error) {
@@ -474,7 +582,7 @@ public class PlayerService extends Service {
             if (fromUser) {
                 nextIndex = 0;
             } else {
-                setState(STATE_ENDED);
+                endQueue();
                 return;
             }
         }
@@ -514,12 +622,15 @@ public class PlayerService extends Service {
 
     public void stopPlayback() {
         playSerial++;
+        main.removeCallbacks(sessionTicker);
         releasePlayer();
         queue.clear();
         index = -1;
         current = null;
         currentArtwork = null;
         playingFromCache = false;
+        ducked = false;
+        resumeOnFocusGain = false;
         lastError = "";
         state = STATE_IDLE;
         if (session != null) {
@@ -544,6 +655,12 @@ public class PlayerService extends Service {
         state = newState;
         updatePlaybackState();
         updateNotification();
+        // Пока играет — обновляем позицию в MediaSession раз в секунду.
+        // На паузе/ошибке периодические обновления прекращаются.
+        main.removeCallbacks(sessionTicker);
+        if (state == STATE_PLAYING) {
+            main.postDelayed(sessionTicker, SESSION_UPDATE_INTERVAL_MS);
+        }
         notifyListeners();
     }
 
@@ -866,12 +983,14 @@ public class PlayerService extends Service {
 
     private boolean requestAudioFocus() {
         if (audioManager == null) {
+            focusState = FOCUS_GRANTED;
             return true;
         }
         AudioAttributes attributes = new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build();
+        int result;
         if (Build.VERSION.SDK_INT >= 26) {
             if (focusRequest == null) {
                 focusRequest = new android.media.AudioFocusRequest.Builder(
@@ -882,17 +1001,24 @@ public class PlayerService extends Service {
                         .setWillPauseWhenDucked(false)
                         .build();
             }
-            int result = audioManager.requestAudioFocus(
+            result = audioManager.requestAudioFocus(
                     (android.media.AudioFocusRequest) focusRequest);
-            return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+        } else {
+            //noinspection deprecation
+            result = audioManager.requestAudioFocus(
+                    focusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
         }
-        //noinspection deprecation
-        int result = audioManager.requestAudioFocus(
-                focusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            focusState = FOCUS_GRANTED;
+            return true;
+        }
+        focusState = FOCUS_NONE;
+        return false;
     }
 
     private void abandonAudioFocus() {
+        focusState = FOCUS_NONE;
+        ducked = false;
         if (audioManager == null) {
             return;
         }
@@ -907,34 +1033,50 @@ public class PlayerService extends Service {
         }
     }
 
+    private void applyVolume() {
+        if (player == null) {
+            return;
+        }
+        float volume = ducked ? 0.2f : 1f;
+        try {
+            player.setVolume(volume, volume);
+        } catch (Exception ignored) {
+        }
+    }
+
     private final AudioManager.OnAudioFocusChangeListener focusListener =
             new AudioManager.OnAudioFocusChangeListener() {
                 @Override
                 public void onAudioFocusChange(int focusChange) {
                     if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+                        focusState = FOCUS_NONE;
+                        ducked = false;
                         resumeOnFocusGain = false;
-                        pause();
+                        if (state == STATE_PLAYING || state == STATE_BUFFERING) {
+                            pauseInternal(false);
+                        }
+                        applyVolume();
                     } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-                        resumeOnFocusGain = state == STATE_PLAYING;
-                        pauseInternal(false);
+                        focusState = FOCUS_LOST_TRANSIENT;
+                        ducked = false;
+                        resumeOnFocusGain = state == STATE_PLAYING
+                                || state == STATE_BUFFERING;
+                        if (state == STATE_PLAYING || state == STATE_BUFFERING) {
+                            pauseInternal(false);
+                        }
+                        applyVolume();
                     } else if (focusChange
                             == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
-                        if (player != null) {
-                            try {
-                                player.setVolume(0.2f, 0.2f);
-                            } catch (Exception ignored) {
-                            }
-                        }
+                        focusState = FOCUS_DUCKED;
+                        ducked = true;
+                        applyVolume();
                     } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
-                        if (player != null) {
-                            try {
-                                player.setVolume(1f, 1f);
-                            } catch (Exception ignored) {
-                            }
-                        }
+                        focusState = FOCUS_GRANTED;
+                        ducked = false;
+                        applyVolume();
                         if (resumeOnFocusGain) {
                             resumeOnFocusGain = false;
-                            resume();
+                            startPlayback();
                         }
                     }
                 }

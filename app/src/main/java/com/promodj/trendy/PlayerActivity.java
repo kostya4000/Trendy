@@ -372,7 +372,7 @@ public class PlayerActivity extends Activity implements PlayerService.Listener {
         if (cacheButton == null || track == null) {
             return;
         }
-        boolean cached = AudioCache.isCached(this, track.id);
+        boolean cached = AudioCache.isSaved(this, track.id);
         boolean downloading = AudioCache.isDownloading(track.id);
         if (cached) {
             cacheButton.setText(R.string.cached);
@@ -393,7 +393,7 @@ public class PlayerActivity extends Activity implements PlayerService.Listener {
             return;
         }
         final Track track = service.getCurrent();
-        if (AudioCache.isCached(this, track.id)) {
+        if (AudioCache.isSaved(this, track.id)) {
             Toast.makeText(this, R.string.cache_already, Toast.LENGTH_SHORT).show();
             return;
         }

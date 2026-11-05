@@ -87,8 +87,25 @@ AndroidX, no third-party dependencies, and Russian UI text.
   `Serializable`. Adding fields also requires updating both `save()` and `load()` in
   `TrackCache`.
 - Feed cache: `cacheDir/trendy/<genre>_<filter>.json`; cover cache: `cacheDir/images`;
-  audio cache: `cacheDir/audio/<trackId>.mp3`. Selected genre/filter is persisted in
-  `SharedPreferences` named `trendy`.
+  user-saved audio: `filesDir/audio/<trackId>.mp3` plus `<trackId>.json` metadata;
+  `cacheDir/audio` is only a legacy/temporary copy and is safe for the system to evict.
+  Selected genre/filter is persisted in `SharedPreferences` named `trendy`.
+- `AudioCache` separates permanent saves from temporary files: `isSaved` means filesDir,
+  `isCached` means either location (playback prefers the saved file). `SettingsActivity`
+  lists saved music, shows saved/temp/free space, and deletes individual tracks or all of it.
+  Do not delete a user's saved file automatically on a playback error; drop only the temp copy.
+- Audio focus is an explicit state machine in `PlayerService`: playback never starts when
+  `requestAudioFocus()` is denied (`audio_focus_denied`), transient loss pauses and resumes on
+  gain, ducking stores a flag and restores volume via `applyVolume()`. Focus is released when
+  the queue ends and on terminal playback errors.
+- Playback errors go through `handleSourceError()`/`handlePlaybackError()`: cache → network,
+  download URL → stream URL, then a bounded number of delayed network retries. `releasePlayer()`
+  runs on every terminal path and outside MediaPlayer callbacks.
+- While playing, `PlayerService` refreshes the MediaSession `PlaybackState` once per second
+  (`sessionTicker`) so system controls show the current position; the ticker stops on pause.
+- `ImageLoader` coalesces concurrent requests for the same URL, ignores stale view results,
+  rejects images over 8 MB before decoding, validates bounds, and caps the disk cache at
+  about 300 files (LRU by `lastModified`).
 - `MainActivity.GENRE_KEYS` must match PromoDJ's URL slugs; display names are separate.
 
 ## Conventions

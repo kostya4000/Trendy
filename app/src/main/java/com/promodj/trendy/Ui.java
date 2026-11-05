@@ -6,6 +6,8 @@ import android.os.Build;
 import android.view.View;
 import android.view.Window;
 
+import java.util.Locale;
+
 final class Ui {
 
     private Ui() {
@@ -78,5 +80,21 @@ final class Ui {
             name = name.substring(0, 80).trim();
         }
         return name;
+    }
+
+    /** Размер в русском формате: 850 КБ, 12,4 МБ. */
+    static String formatSize(long bytes) {
+        if (bytes < 1024L) {
+            return Math.max(0L, bytes) + " Б";
+        }
+        double kb = bytes / 1024.0;
+        if (kb < 1024.0) {
+            return Math.round(kb) + " КБ";
+        }
+        double mb = kb / 1024.0;
+        if (mb < 1024.0) {
+            return String.format(Locale.US, "%.1f", mb).replace('.', ',') + " МБ";
+        }
+        return String.format(Locale.US, "%.2f", mb / 1024.0).replace('.', ',') + " ГБ";
     }
 }
