@@ -70,6 +70,16 @@
                 android:visibility="invisible" />
 
             <ImageView
+                android:id="@+id/favorite"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginStart="4dp"
+                android:src="@drawable/ic_heart_filled"
+                android:tint="@color/accent"
+                android:contentDescription="@string/favorites"
+                android:visibility="gone" />
+
+            <ImageView
                 android:id="@+id/cached"
                 android:layout_width="14dp"
                 android:layout_height="14dp"

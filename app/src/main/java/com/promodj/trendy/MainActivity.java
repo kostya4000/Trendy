@@ -262,6 +262,26 @@ public class MainActivity extends Activity implements PlayerService.Listener {
                 PlayerService.play(MainActivity.this, new ArrayList<>(items), position);
             }
         });
+        // На ТВ и в ленте удержание строки — самый быстрый способ положить
+        // трек в избранное, не открывая полноэкранный плеер.
+        listView.setOnItemLongClickListener(
+                new android.widget.AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(android.widget.AdapterView<?> parent,
+                                           View view, int position, long id) {
+                List<Track> items = adapter.getItems();
+                if (position < 0 || position >= items.size()) {
+                    return false;
+                }
+                Track track = items.get(position);
+                boolean added = Favorites.toggle(MainActivity.this, track);
+                adapter.notifyDataSetChanged();
+                Toast.makeText(MainActivity.this,
+                        added ? R.string.favorite_added : R.string.favorite_removed,
+                        Toast.LENGTH_SHORT).show();
+                return true;
+            }
+        });
 
         findViewById(R.id.retry).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -276,6 +296,15 @@ public class MainActivity extends Activity implements PlayerService.Listener {
                 loadFeed();
             }
         });
+        View favoritesButton = findViewById(R.id.favorites);
+        if (favoritesButton != null) {
+            favoritesButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    startActivity(new Intent(MainActivity.this, FavoritesActivity.class));
+                }
+            });
+        }
         View settingsButton = findViewById(R.id.settings);
         if (settingsButton != null) {
             settingsButton.setOnClickListener(new View.OnClickListener() {
@@ -388,6 +417,10 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         main.post(ticker);
         refreshMiniPlayer();
         updateHighlight();
+        // Избранное могло измениться на экране плеера — обновляем сердца.
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
     }
 
     @Override

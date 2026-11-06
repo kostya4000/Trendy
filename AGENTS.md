@@ -90,6 +90,12 @@ AndroidX, no third-party dependencies, and Russian UI text.
   user-saved audio: `filesDir/audio/<trackId>.mp3` plus `<trackId>.json` metadata;
   `cacheDir/audio` is only a legacy/temporary copy and is safe for the system to evict.
   Selected genre/filter is persisted in `SharedPreferences` named `trendy`.
+- Favorites live in `filesDir/favorites.json` (`Favorites`): newest first, in-memory
+  indexes for `isFavorite`, asynchronous atomic writes. The heart on the full-screen
+  player, a long-press on a feed row, and “Убрать” in `FavoritesActivity` toggle the
+  same list; favorited feed rows show a heart next to the cached marker. Any new
+  toggle entry point should go through `Favorites.toggle()`/`remove()` so the file
+  stays the single source of truth.
 - Last playback session (queue, index, position) lives in `filesDir/playback.json`
   (`PlaybackCache`). `PlayerService` restores it in `onCreate` as `STATE_PAUSED` with
   `pendingSeekMs`, so the mini-player shows the last track and play continues from the

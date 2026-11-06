@@ -44,6 +44,7 @@ public class PlayerActivity extends Activity implements PlayerService.Listener {
     private TextView status;
     private TextView downloadButton;
     private TextView cacheButton;
+    private ImageButton favoriteButton;
 
     private final Runnable ticker = new Runnable() {
         @Override
@@ -96,6 +97,7 @@ public class PlayerActivity extends Activity implements PlayerService.Listener {
         status = (TextView) findViewById(R.id.status);
         downloadButton = (TextView) findViewById(R.id.download);
         cacheButton = (TextView) findViewById(R.id.cache);
+        favoriteButton = (ImageButton) findViewById(R.id.favorite);
 
         cover.setCornerRadius(Ui.dp(this, 22));
         resizeCover();
@@ -110,6 +112,12 @@ public class PlayerActivity extends Activity implements PlayerService.Listener {
             @Override
             public void onClick(View view) {
                 shareCurrent();
+            }
+        });
+        favoriteButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                toggleFavorite();
             }
         });
         findViewById(R.id.prev).setOnClickListener(new View.OnClickListener() {
@@ -297,6 +305,7 @@ public class PlayerActivity extends Activity implements PlayerService.Listener {
         }
 
         updateCacheButton(track);
+        updateFavoriteButton(track);
 
         int state = service.getState();
         boolean pauseIcon = state == PlayerService.STATE_PLAYING
@@ -336,6 +345,30 @@ public class PlayerActivity extends Activity implements PlayerService.Listener {
                 timeCurrent.setText(Ui.formatTime(position / 1000));
             }
         }
+    }
+
+    private void updateFavoriteButton(Track track) {
+        if (favoriteButton == null || track == null) {
+            return;
+        }
+        boolean favorite = Favorites.isFavorite(this, track.id);
+        favoriteButton.setImageResource(favorite
+                ? R.drawable.ic_heart_filled : R.drawable.ic_heart_outline);
+        favoriteButton.setColorFilter(getColor(favorite
+                ? R.color.accent : R.color.text_dim));
+        favoriteButton.setContentDescription(getString(favorite
+                ? R.string.favorite_remove : R.string.favorite_add));
+    }
+
+    private void toggleFavorite() {
+        if (service == null || service.getCurrent() == null) {
+            return;
+        }
+        Track track = service.getCurrent();
+        boolean added = Favorites.toggle(this, track);
+        updateFavoriteButton(track);
+        Toast.makeText(this, added ? R.string.favorite_added : R.string.favorite_removed,
+                Toast.LENGTH_SHORT).show();
     }
 
     private void shareCurrent() {

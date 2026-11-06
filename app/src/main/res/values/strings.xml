@@ -60,4 +60,14 @@
     <string name="settings_playing">Играет: %1$s</string>
     <string name="settings_play_hint">Нажмите на трек, чтобы включить</string>
     <string name="cancel">Отмена</string>
+    <string name="favorites">Избранное</string>
+    <string name="favorites_summary">%1$d %2$s в избранном</string>
+    <string name="favorites_empty">Здесь появятся треки, добавленные в избранное.</string>
+    <string name="favorites_hint">Нажмите на трек, чтобы включить его. «Убрать» удаляет трек из избранного. В ленте избранное переключается удержанием строки, а в плеере — кнопкой с сердцем.</string>
+    <string name="favorites_remove">Убрать</string>
+    <string name="favorite_add">В избранное</string>
+    <string name="favorite_remove">Убрать из избранного</string>
+    <string name="favorite_added">Добавлено в избранное</string>
+    <string name="favorite_removed">Убрано из избранного</string>
+    <string name="favorite_hint">Удерживайте трек в ленте, чтобы добавить его в избранное</string>
 </resources>

@@ -69,6 +69,7 @@ public class TrackAdapter extends BaseAdapter {
             holder.duration = (TextView) convertView.findViewById(R.id.duration);
             holder.equalizer = (ImageView) convertView.findViewById(R.id.equalizer);
             holder.cached = (ImageView) convertView.findViewById(R.id.cached);
+            holder.favorite = (ImageView) convertView.findViewById(R.id.favorite);
             convertView.setTag(holder);
         } else {
             holder = (ViewHolder) convertView.getTag();
@@ -84,6 +85,8 @@ public class TrackAdapter extends BaseAdapter {
         holder.equalizer.setVisibility(current && playing ? View.VISIBLE : View.INVISIBLE);
         holder.cached.setVisibility(AudioCache.isCached(context, track.id)
                 ? View.VISIBLE : View.GONE);
+        holder.favorite.setVisibility(Favorites.isFavorite(context, track.id)
+                ? View.VISIBLE : View.GONE);
         holder.cover.setAlpha(current ? 1f : 0.94f);
         convertView.setBackgroundResource(
                 current ? R.drawable.bg_row_current : R.drawable.bg_row);
@@ -98,5 +101,6 @@ public class TrackAdapter extends BaseAdapter {
         TextView duration;
         ImageView equalizer;
         ImageView cached;
+        ImageView favorite;
     }
 }
