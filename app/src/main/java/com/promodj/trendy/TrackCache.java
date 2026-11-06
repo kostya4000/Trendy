@@ -48,19 +48,7 @@ final class TrackCache {
         try {
             JSONArray array = new JSONArray();
             for (Track track : tracks) {
-                JSONObject item = new JSONObject();
-                item.put("id", track.id);
-                item.put("title", track.title);
-                item.put("artist", track.artist);
-                item.put("user", track.user);
-                item.put("kind", track.kind);
-                item.put("page", track.pageUrl);
-                item.put("stream", track.streamUrl);
-                item.put("download", track.downloadUrl);
-                item.put("cover", track.coverUrl);
-                item.put("coverLarge", track.coverLargeUrl);
-                item.put("duration", track.durationSec);
-                array.put(item);
+                array.put(TrackJson.toJson(track));
             }
             JSONObject root = new JSONObject();
             root.put("savedAt", System.currentTimeMillis());
@@ -119,18 +107,7 @@ final class TrackCache {
                 if (item == null) {
                     continue;
                 }
-                Track track = new Track();
-                track.id = item.optLong("id");
-                track.title = item.optString("title");
-                track.artist = item.optString("artist");
-                track.user = item.optString("user");
-                track.kind = item.optString("kind");
-                track.pageUrl = item.optString("page");
-                track.streamUrl = item.optString("stream");
-                track.downloadUrl = item.optString("download");
-                track.coverUrl = item.optString("cover");
-                track.coverLargeUrl = item.optString("coverLarge");
-                track.durationSec = item.optInt("duration");
+                Track track = TrackJson.fromJson(item);
                 tracks.add(track);
             }
             return new Cached(tracks, root.optLong("savedAt"));

@@ -347,18 +347,7 @@ final class AudioCache {
         File part = new File(savedDir(context), track.id + ".json.part");
         FileOutputStream output = null;
         try {
-            JSONObject root = new JSONObject();
-            root.put("id", track.id);
-            root.put("title", track.title);
-            root.put("artist", track.artist);
-            root.put("user", track.user);
-            root.put("kind", track.kind);
-            root.put("page", track.pageUrl);
-            root.put("stream", track.streamUrl);
-            root.put("download", track.downloadUrl);
-            root.put("cover", track.coverUrl);
-            root.put("coverLarge", track.coverLargeUrl);
-            root.put("duration", track.durationSec);
+            JSONObject root = TrackJson.toJson(track);
             root.put("savedAt", System.currentTimeMillis());
 
             output = new FileOutputStream(part);
@@ -398,18 +387,10 @@ final class AudioCache {
                     text.append(buffer, 0, read);
                 }
                 JSONObject item = new JSONObject(text.toString());
-                track = new Track();
-                track.id = item.optLong("id", trackId);
-                track.title = item.optString("title");
-                track.artist = item.optString("artist");
-                track.user = item.optString("user");
-                track.kind = item.optString("kind");
-                track.pageUrl = item.optString("page");
-                track.streamUrl = item.optString("stream");
-                track.downloadUrl = item.optString("download");
-                track.coverUrl = item.optString("cover");
-                track.coverLargeUrl = item.optString("coverLarge");
-                track.durationSec = item.optInt("duration");
+                track = TrackJson.fromJson(item);
+                if (track.id <= 0) {
+                    track.id = trackId;
+                }
                 savedAt = item.optLong("savedAt", savedAt);
             }
         } catch (Exception ignored) {

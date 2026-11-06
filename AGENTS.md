@@ -90,6 +90,12 @@ AndroidX, no third-party dependencies, and Russian UI text.
   user-saved audio: `filesDir/audio/<trackId>.mp3` plus `<trackId>.json` metadata;
   `cacheDir/audio` is only a legacy/temporary copy and is safe for the system to evict.
   Selected genre/filter is persisted in `SharedPreferences` named `trendy`.
+- Last playback session (queue, index, position) lives in `filesDir/playback.json`
+  (`PlaybackCache`). `PlayerService` restores it in `onCreate` as `STATE_PAUSED` with
+  `pendingSeekMs`, so the mini-player shows the last track and play continues from the
+  saved position; it never auto-plays on launch. Position is written every 5 s while
+  playing, on pause/seek/track change, and synchronously in `onDestroy`;
+  `stopPlayback()` clears the session.
 - `AudioCache` separates permanent saves from temporary files: `isSaved` means filesDir,
   `isCached` means either location (playback prefers the saved file). `SettingsActivity`
   lists saved music, shows saved/temp/free space, and deletes individual tracks or all of it.

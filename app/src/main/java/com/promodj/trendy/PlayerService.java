@@ -48,6 +48,8 @@ public class PlayerService extends Service {
     private static final long NETWORK_RETRY_DELAY_MS = 1200L;
     /** PlaybackState для системных элементов обновляем примерно раз в секунду. */
     private static final long SESSION_UPDATE_INTERVAL_MS = 1000L;
+    /** Позицию последней сессии сохраняем не чаще раза в 5 секунд. */
+    private static final long SESSION_SAVE_INTERVAL_MS = 5000L;
 
     private static final int FOCUS_NONE = 0;
     private static final int FOCUS_GRANTED = 1;
@@ -113,6 +115,7 @@ public class PlayerService extends Service {
     private volatile boolean destroyed;
     private Bitmap currentArtwork;
     private NotificationManager notificationManager;
+    private long lastSessionSave;
 
     /**
      * Пока играет музыка, позиция в MediaSession должна «идти»: системный
@@ -126,6 +129,10 @@ public class PlayerService extends Service {
             }
             if (state == STATE_PLAYING) {
                 updatePlaybackState();
+                if (System.currentTimeMillis() - lastSessionSave
+                        >= SESSION_SAVE_INTERVAL_MS) {
+                    persistSession();
+                }
                 main.postDelayed(this, SESSION_UPDATE_INTERVAL_MS);
             }
         }
@@ -159,6 +166,7 @@ public class PlayerService extends Service {
         audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
         createNotificationChannel();
         setupMediaSession();
+        restoreSession();
         try {
             registerReceiver(noisyReceiver,
                     new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
@@ -214,6 +222,8 @@ public class PlayerService extends Service {
 
     @Override
     public void onDestroy() {
+        // Сервис может умереть в любой момент — фиксируем позицию сразу.
+        saveSessionBeforeDestroy();
         destroyed = true;
         playSerial++;
         main.removeCallbacks(sessionTicker);
@@ -239,18 +249,71 @@ public class PlayerService extends Service {
 
     // ---------------------------------------------------------------- playback
 
+    /**
+     * Возвращает последнюю сессию: очередь, трек и позицию. Воспроизведение
+     * не запускаем — приложение не должно зазвучать само при старте, но
+     * мини-плеер сразу показывает, где остановились, и play продолжит
+     * с этого места.
+     */
+    private void restoreSession() {
+        PlaybackCache.Snapshot snapshot = PlaybackCache.load(this);
+        if (snapshot == null || snapshot.queue.isEmpty()) {
+            return;
+        }
+        queue.clear();
+        queue.addAll(snapshot.queue);
+        index = snapshot.index;
+        current = queue.get(index);
+        pendingSeekMs = snapshot.positionMs;
+        state = STATE_PAUSED;
+        updateSessionMetadata(current, null);
+        updatePlaybackState();
+        if (session != null) {
+            // Без уведомления не стоит висеть в системных медиа-контролах.
+            session.setActive(false);
+        }
+    }
+
+    private void persistSession() {
+        persistSession(getPosition());
+    }
+
+    private void persistSession(int positionMs) {
+        if (current == null || queue.isEmpty() || index < 0 || index >= queue.size()) {
+            return;
+        }
+        lastSessionSave = System.currentTimeMillis();
+        PlaybackCache.saveAsync(this, queue, index, Math.max(0, positionMs));
+    }
+
+    /** Синхронный снимок на случай, если процесс вот-вот завершится. */
+    private void saveSessionBeforeDestroy() {
+        if (current == null || queue.isEmpty() || index < 0 || index >= queue.size()) {
+            return;
+        }
+        int position = (state == STATE_PLAYING || state == STATE_BUFFERING
+                || state == STATE_PAUSED) ? getPosition() : 0;
+        PlaybackCache.saveNow(this, queue, index, Math.max(0, position));
+    }
+
     private void playAt(int position) {
+        playAt(position, -1);
+    }
+
+    private void playAt(int position, int startMs) {
         if (destroyed || position < 0 || position >= queue.size()) {
             return;
         }
         index = position;
         current = queue.get(position);
-        pendingSeekMs = -1;
+        pendingSeekMs = startMs;
         currentArtwork = null;
         lastError = "";
         networkRetries = 0;
         int serial = ++playSerial;
         releasePlayer();
+        // Запоминаем, что играет сейчас, ещё до загрузки источника.
+        persistSession(startMs >= 0 ? startMs : 0);
 
         // Без аудиофокуса не начинаем: иначе музыка зазвучит поверх
         // навигатора или звонка.
@@ -558,7 +621,8 @@ public class PlayerService extends Service {
         if (state == STATE_ENDED || state == STATE_ERROR
                 || player == null || !playerPrepared) {
             consecutiveErrors = 0;
-            playAt(index < 0 ? 0 : index);
+            // Позиция могла остаться от восстановленной сессии.
+            playAt(index < 0 ? 0 : index, pendingSeekMs);
             return;
         }
         try {
@@ -616,6 +680,7 @@ public class PlayerService extends Service {
         } else {
             pendingSeekMs = milliseconds;
         }
+        persistSession(milliseconds);
         updatePlaybackState();
         notifyListeners();
     }
@@ -645,6 +710,7 @@ public class PlayerService extends Service {
         if (notificationManager != null) {
             notificationManager.cancel(NOTIFICATION_ID);
         }
+        PlaybackCache.clear(this);
         notifyListeners();
         stopSelf();
     }
@@ -660,6 +726,16 @@ public class PlayerService extends Service {
         main.removeCallbacks(sessionTicker);
         if (state == STATE_PLAYING) {
             main.postDelayed(sessionTicker, SESSION_UPDATE_INTERVAL_MS);
+        }
+        // Пауза — самый важный момент для сохранения позиции; после конца
+        // очереди трек при следующем запуске начнётся сначала.
+        if (state == STATE_PAUSED) {
+            persistSession();
+        } else if (state == STATE_ENDED) {
+            persistSession(0);
+        } else if (state == STATE_ERROR) {
+            // Если сеть подвела до подготовки, не теряем восстановленную позицию.
+            persistSession(pendingSeekMs >= 0 ? pendingSeekMs : 0);
         }
         notifyListeners();
     }
@@ -713,6 +789,10 @@ public class PlayerService extends Service {
                 return Math.max(0, player.getCurrentPosition());
             } catch (Exception ignored) {
             }
+        }
+        // Позиция из восстановленной сессии — до первого prepare.
+        if (pendingSeekMs >= 0) {
+            return pendingSeekMs;
         }
         return 0;
     }
