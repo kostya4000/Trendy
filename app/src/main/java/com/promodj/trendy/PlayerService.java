@@ -274,6 +274,20 @@ public class PlayerService extends Service {
         }
     }
 
+    /**
+     * Сервис, к которому UI лишь привязан (bind), система уничтожает, когда
+     * активность пересоздаётся при повороте экрана, — вместе с MediaPlayer.
+     * Поэтому на старте воспроизведения переводим его в started-состояние:
+     * музыка переживает смену ориентации и уход активности.
+     */
+    private void ensureStarted() {
+        try {
+            startService(new Intent(this, PlayerService.class));
+        } catch (Exception error) {
+            Log.w(TAG, "startService failed", error);
+        }
+    }
+
     private void persistSession() {
         persistSession(getPosition());
     }
@@ -304,6 +318,7 @@ public class PlayerService extends Service {
         if (destroyed || position < 0 || position >= queue.size()) {
             return;
         }
+        ensureStarted();
         index = position;
         current = queue.get(position);
         pendingSeekMs = startMs;
@@ -618,6 +633,7 @@ public class PlayerService extends Service {
         if (current == null) {
             return;
         }
+        ensureStarted();
         if (state == STATE_ENDED || state == STATE_ERROR
                 || player == null || !playerPrepared) {
             consecutiveErrors = 0;

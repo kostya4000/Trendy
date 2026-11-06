@@ -96,6 +96,10 @@ AndroidX, no third-party dependencies, and Russian UI text.
   saved position; it never auto-plays on launch. Position is written every 5 s while
   playing, on pause/seek/track change, and synchronously in `onDestroy`;
   `stopPlayback()` clears the session.
+- Because restored playback starts from a bound-only service, `playAt()`/`startPlayback()`
+  call `ensureStarted()` to promote it to a started service. Otherwise unbinding during an
+  orientation change would destroy the service and pause the music. Keep this when
+  changing how activities bind.
 - `AudioCache` separates permanent saves from temporary files: `isSaved` means filesDir,
   `isCached` means either location (playback prefers the saved file). `SettingsActivity`
   lists saved music, shows saved/temp/free space, and deletes individual tracks or all of it.
