@@ -71,6 +71,7 @@ public class MainActivity extends Activity implements PlayerService.Listener {
     private ImageButton miniPlay;
     private ProgressBar miniProgress;
     private ImageButton refreshButton;
+    private ImageButton favoritesButton;
     private TextView miniTimeCurrent;
     private TextView miniTimeTotal;
 
@@ -186,6 +187,7 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         meta = (TextView) findViewById(R.id.meta);
         genreRow = (LinearLayout) findViewById(R.id.genreRow);
         refreshButton = (ImageButton) findViewById(R.id.refresh);
+        favoritesButton = (ImageButton) findViewById(R.id.favorites);
 
         miniPlayer = findViewById(R.id.miniPlayer);
         panelMode = findViewById(R.id.playerPanel) != null;
@@ -276,6 +278,7 @@ public class MainActivity extends Activity implements PlayerService.Listener {
                 Track track = items.get(position);
                 boolean added = Favorites.toggle(MainActivity.this, track);
                 adapter.notifyDataSetChanged();
+                updateFavoritesHeader();
                 Toast.makeText(MainActivity.this,
                         added ? R.string.favorite_added : R.string.favorite_removed,
                         Toast.LENGTH_SHORT).show();
@@ -722,6 +725,7 @@ public class MainActivity extends Activity implements PlayerService.Listener {
     // ---------------------------------------------------------------- player
 
     private void refreshMiniPlayer() {
+        updateFavoritesHeader();
         Track track = service == null ? null : service.getCurrent();
         if (track == null) {
             if (panelMode) {
@@ -744,6 +748,19 @@ public class MainActivity extends Activity implements PlayerService.Listener {
                 ? R.drawable.ic_pause_white : R.drawable.ic_play_white);
         miniPlay.setContentDescription(getString(pauseIcon ? R.string.pause : R.string.play));
         updatePanelButtons(track);
+    }
+
+    /** Шапка показывает, что текущий трек уже в избранном. */
+    private void updateFavoritesHeader() {
+        if (favoritesButton == null) {
+            return;
+        }
+        Track current = service == null ? null : service.getCurrent();
+        boolean favorite = current != null && Favorites.isFavorite(this, current.id);
+        favoritesButton.setImageResource(favorite
+                ? R.drawable.ic_heart_filled : R.drawable.ic_heart_outline);
+        favoritesButton.setColorFilter(getColor(favorite
+                ? R.color.accent : R.color.text_dim));
     }
 
     /** Состояние кнопок «В кэш» и «Скачать» на панели. */

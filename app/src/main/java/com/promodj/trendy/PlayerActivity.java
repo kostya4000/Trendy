@@ -114,12 +114,14 @@ public class PlayerActivity extends Activity implements PlayerService.Listener {
                 shareCurrent();
             }
         });
-        favoriteButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                toggleFavorite();
-            }
-        });
+        if (favoriteButton != null) {
+            favoriteButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    toggleFavorite();
+                }
+            });
+        }
         findViewById(R.id.prev).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {

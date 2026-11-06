@@ -57,6 +57,9 @@ AndroidX, no third-party dependencies, and Russian UI text.
   Keep interactive views `focusable` with the `bg_focus_*` foregrounds and the ListView
   `bg_row_focus` selector so D-pad/remote focus stays visible. Don't re-add
   `android:screenOrientation="portrait"`.
+- `activity_player.xml` and `layout-land/activity_player.xml` are separate layouts: any new
+  control must be added to both, or `PlayerActivity` will crash with an NPE on rotation
+  when `findViewById` returns null in the other orientation. The favorite heart is in both.
 - `layout-land/activity_main.xml` is a two-pane screen: `@id/playerPanel` on the left with the
   mini-player ids (`miniCover`, `miniTitle`, `miniArtist`, `miniProgress` as SeekBar,
   `miniPrev`, `miniPlay`, `miniNext`) plus `panelCache`/`panelDownload`, list and filters on
@@ -93,9 +96,10 @@ AndroidX, no third-party dependencies, and Russian UI text.
 - Favorites live in `filesDir/favorites.json` (`Favorites`): newest first, in-memory
   indexes for `isFavorite`, asynchronous atomic writes. The heart on the full-screen
   player, a long-press on a feed row, and “Убрать” in `FavoritesActivity` toggle the
-  same list; favorited feed rows show a heart next to the cached marker. Any new
-  toggle entry point should go through `Favorites.toggle()`/`remove()` so the file
-  stays the single source of truth.
+  same list; favorited feed rows show a heart next to the cached marker, and the header
+  heart on `MainActivity` is filled when the current track is a favorite (it still opens
+  the list). Any new toggle entry point should go through `Favorites.toggle()`/`remove()`
+  so the file stays the single source of truth.
 - Last playback session (queue, index, position) lives in `filesDir/playback.json`
   (`PlaybackCache`). `PlayerService` restores it in `onCreate` as `STATE_PAUSED` with
   `pendingSeekMs`, so the mini-player shows the last track and play continues from the
