@@ -136,6 +136,19 @@ AndroidX, no third-party dependencies, and Russian UI text.
   about 300 files (LRU by `lastModified`).
 - `MainActivity.GENRE_KEYS` must match PromoDJ's URL slugs; display names are separate.
 
+## Icons and branding
+
+- Launcher icons live in `mipmap-xxxhdpi` only, as WebP: `ic_launcher.webp` (rounded
+  square), `ic_launcher_round.webp` (circle) and `ic_launcher_foreground.webp` (108dp
+  adaptive layer with a blurred background baked in). The system scales them to the
+  device density, and WebP keeps the APK small; minSdk 23 supports it.
+- `mipmap-anydpi-v26/ic_launcher{,_round}.xml` combine `@color/ic_launcher_background`
+  with `@mipmap/ic_launcher_foreground`. Do not add a separate adaptive background
+  bitmap: the foreground already covers the whole 108dp canvas.
+- Icons and the TV banner are regenerated with `tools/make-icons.py <logo.png>` (needs
+  Pillow). The source logo is not in the repo; without it the script cannot reproduce
+  the artwork, so keep the generated files rather than deleting them.
+
 ## Conventions
 
 - All UI copy is Russian. Put new text in `app/src/main/res/values/strings.xml` (some legacy

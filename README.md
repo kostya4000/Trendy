@@ -157,7 +157,7 @@ app/src/main/java/com/promodj/trendy/
   FavoritesAdapter.java список избранных треков
   RoundedImageView.java обложки со скруглёнными углами
   Ui.java               dp, время, размеры, системные бары
-tools/MakeIcon.java     генерация launcher-иконок
+tools/make-icons.py     иконки и ТВ-баннер из PNG-логотипа
 tools/FileServer.java   локальная раздача APK
 tools/bump-version.sh   повышение версии перед релизом
 ```
