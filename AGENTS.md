@@ -63,6 +63,11 @@ AndroidX, no third-party dependencies, and Russian UI text.
 - `activity_settings.xml` also has a `layout-land` variant with the same ids: in landscape
   the donate button (`settingsDonate`, CloudTips link) joins the cache/delete row to keep the
   saved-music list from shrinking. Update both files when adding a control there.
+- Gesture navigation draws a transparent bar over the window, so every full-height screen
+  calls `Ui.applyBottomInset(rootView)` after `setContentView`; it adds the navigation-bar
+  inset to the bottom padding. Without it the last row of buttons is cut off. The landscape
+  main panel and player are compacted to fit a 360dp-high screen (hiding the cover is
+  expected there); keep their fixed heights small when editing.
 - `layout-land/activity_main.xml` is a two-pane screen: `@id/playerPanel` on the left with the
   mini-player ids (`miniCover`, `miniTitle`, `miniArtist`, `miniProgress` as SeekBar,
   `miniPrev`, `miniPlay`, `miniNext`) plus `panelCache`/`panelDownload`, list and filters on

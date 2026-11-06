@@ -5,6 +5,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
 
 import java.util.Locale;
 
@@ -35,6 +36,26 @@ final class Ui {
         drawable.setColor(color);
         drawable.setCornerRadius(dp(context, radiusDp));
         return drawable;
+    }
+
+    /**
+     * Поднимает содержимое над панелью навигации. На жестовой навигации она
+     * прозрачная и рисуется поверх окна, поэтому нижние кнопки иначе обрезаются.
+     */
+    static void applyBottomInset(final View view) {
+        if (view == null) {
+            return;
+        }
+        final int baseBottom = view.getPaddingBottom();
+        view.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override
+            public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                v.setPadding(v.getPaddingLeft(), v.getPaddingTop(), v.getPaddingRight(),
+                        baseBottom + insets.getSystemWindowInsetBottom());
+                return insets;
+            }
+        });
+        view.requestApplyInsets();
     }
 
     static void darkSystemBars(Context context) {

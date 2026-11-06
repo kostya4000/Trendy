@@ -44,6 +44,7 @@ public class SettingsActivity extends Activity {
         super.onCreate(savedInstanceState);
         Ui.darkSystemBars(this);
         setContentView(R.layout.activity_settings);
+        Ui.applyBottomInset(findViewById(R.id.settingsRoot));
 
         list = (ListView) findViewById(R.id.settingsList);
         storageInfo = (TextView) findViewById(R.id.settingsStorage);

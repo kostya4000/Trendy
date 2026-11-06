@@ -23,6 +23,7 @@ public class FavoritesActivity extends Activity {
         super.onCreate(savedInstanceState);
         Ui.darkSystemBars(this);
         setContentView(R.layout.activity_favorites);
+        Ui.applyBottomInset(findViewById(R.id.favoritesRoot));
 
         list = (ListView) findViewById(R.id.favoritesList);
         summary = (TextView) findViewById(R.id.favoritesSummary);

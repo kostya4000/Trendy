@@ -85,6 +85,7 @@ public class PlayerActivity extends Activity implements PlayerService.Listener {
         super.onCreate(savedInstanceState);
         Ui.darkSystemBars(this);
         setContentView(R.layout.activity_player);
+        Ui.applyBottomInset(findViewById(R.id.playerContent));
 
         background = (ImageView) findViewById(R.id.playerBackground);
         cover = (RoundedImageView) findViewById(R.id.cover);

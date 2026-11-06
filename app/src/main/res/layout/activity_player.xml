@@ -18,6 +18,7 @@
         android:background="@drawable/bg_player_overlay" />
 
     <LinearLayout
+        android:id="@+id/playerContent"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
@@ -231,8 +232,10 @@
                 android:foreground="@drawable/bg_focus_ring"
                 android:gravity="center"
                 android:text="@string/cache"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:textColor="@color/text_dim"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:fontFamily="sans-serif-medium" />
 
             <TextView
@@ -249,8 +252,10 @@
                 android:foreground="@drawable/bg_focus_ring"
                 android:gravity="center"
                 android:text="@string/download"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:textColor="@color/text_dim"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:fontFamily="sans-serif-medium" />
 
             <TextView
@@ -266,8 +271,10 @@
                 android:foreground="@drawable/bg_focus_ring"
                 android:gravity="center"
                 android:text="@string/open_site"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:textColor="@color/text_dim"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:fontFamily="sans-serif-medium" />
         </LinearLayout>
     </LinearLayout>

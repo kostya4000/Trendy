@@ -169,6 +169,7 @@ public class MainActivity extends Activity implements PlayerService.Listener {
         super.onCreate(savedInstanceState);
         Ui.darkSystemBars(this);
         setContentView(R.layout.activity_main);
+        Ui.applyBottomInset(findViewById(R.id.mainRoot));
 
         preferences = getSharedPreferences(PREFS, MODE_PRIVATE);
         genre = preferences.getString("genre", "edm");
