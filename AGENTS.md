@@ -60,6 +60,9 @@ AndroidX, no third-party dependencies, and Russian UI text.
 - `activity_player.xml` and `layout-land/activity_player.xml` are separate layouts: any new
   control must be added to both, or `PlayerActivity` will crash with an NPE on rotation
   when `findViewById` returns null in the other orientation. The favorite heart is in both.
+- `activity_settings.xml` also has a `layout-land` variant with the same ids: in landscape
+  the donate button (`settingsDonate`, CloudTips link) joins the cache/delete row to keep the
+  saved-music list from shrinking. Update both files when adding a control there.
 - `layout-land/activity_main.xml` is a two-pane screen: `@id/playerPanel` on the left with the
   mini-player ids (`miniCover`, `miniTitle`, `miniArtist`, `miniProgress` as SeekBar,
   `miniPrev`, `miniPlay`, `miniNext`) plus `panelCache`/`panelDownload`, list and filters on

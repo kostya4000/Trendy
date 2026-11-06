@@ -2,7 +2,10 @@ package com.promodj.trendy;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,6 +21,9 @@ import java.util.concurrent.Executors;
 
 /** Настройки: сохранённая музыка, место на устройстве и очистка кэша. */
 public class SettingsActivity extends Activity {
+
+    /** Страница поддержки разработчика на CloudTips. */
+    private static final String DONATE_URL = "https://pay.cloudtips.ru/p/5320281d";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
@@ -77,6 +83,12 @@ public class SettingsActivity extends Activity {
             @Override
             public void onClick(View view) {
                 confirmDeleteAll();
+            }
+        });
+        findViewById(R.id.settingsDonate).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                openDonatePage();
             }
         });
     }
@@ -147,6 +159,15 @@ public class SettingsActivity extends Activity {
         Toast.makeText(this,
                 getString(R.string.settings_playing, saved.track.title),
                 Toast.LENGTH_SHORT).show();
+    }
+
+    private void openDonatePage() {
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(DONATE_URL));
+        try {
+            startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, R.string.settings_donate_error, Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void deleteOne(final AudioCache.Saved saved) {
