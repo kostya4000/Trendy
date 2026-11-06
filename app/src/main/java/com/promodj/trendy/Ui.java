@@ -3,9 +3,11 @@ package com.promodj.trendy;
 import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
+import android.widget.ListView;
 
 import java.util.Locale;
 
@@ -56,6 +58,86 @@ final class Ui {
             }
         });
         view.requestApplyInsets();
+    }
+
+    /** Строка списка с действием, до которого нужно добраться пультом. */
+    interface RowAction {
+        int getCount();
+
+        int getActionPosition();
+
+        void setActionPosition(int position);
+
+        void performAction(int position);
+
+        /** Обычное нажатие на строку: включить трек. */
+        void performPrimary(int position);
+    }
+
+    /**
+     * Пускает пульт к кнопке в строке списка. ListView забирает стрелки себе и
+     * focusable-кнопки внутри строк недоступны, поэтому «фокус» на кнопке
+     * рисуем сами: RIGHT включает его на выбранной строке (кнопка получает
+     * ring), LEFT выключает, ENTER нажимает кнопку, UP/DOWN ведут по строкам,
+     * а ring едет вместе с выделением.
+     */
+    static void bindRowAction(final ListView list, final RowAction action) {
+        list.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View view, int keyCode, KeyEvent event) {
+                if (event.getAction() != KeyEvent.ACTION_DOWN) {
+                    return false;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    int position = list.getSelectedItemPosition();
+                    if (position == ListView.INVALID_POSITION) {
+                        position = list.getFirstVisiblePosition();
+                    }
+                    if (position < 0 || position >= action.getCount()) {
+                        return false;
+                    }
+                    action.setActionPosition(position);
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    if (action.getActionPosition() < 0) {
+                        return false;
+                    }
+                    action.setActionPosition(-1);
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+                        || keyCode == KeyEvent.KEYCODE_ENTER) {
+                    if (action.getActionPosition() < 0) {
+                        int position = list.getSelectedItemPosition();
+                        if (position == ListView.INVALID_POSITION) {
+                            return false;
+                        }
+                        action.performPrimary(position);
+                        return true;
+                    }
+                    int position = action.getActionPosition();
+                    action.setActionPosition(-1);
+                    action.performAction(position);
+                    return true;
+                }
+                return false;
+            }
+        });
+        list.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view,
+                    int position, long id) {
+                if (action.getActionPosition() >= 0) {
+                    action.setActionPosition(position);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {
+                action.setActionPosition(-1);
+            }
+        });
     }
 
     static void darkSystemBars(Context context) {

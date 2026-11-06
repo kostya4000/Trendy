@@ -82,6 +82,14 @@ AndroidX, no third-party dependencies, and Russian UI text.
   `bg_genre_chip` / `bg_filter_tab` state-lists (selected/focused) plus
   `color/genre_chip_text` / `color/filter_tab_text`; `setForeground` rings do not work for
   programmatically created chips.
+- `ListView` swallows the D-pad and a focusable child blocks item clicks, so the button
+  inside a row cannot simply take focus. `Ui.bindRowAction(list, adapter)` draws the
+  "button focus" itself: RIGHT rings the row's button, LEFT clears it, OK presses it,
+  otherwise OK plays the row. The ring is `bg_focus_ring_solid` set as the button's
+  foreground by `FavoritesAdapter`/`SavedAdapter` (`actionPosition`). After removing an
+  item the activity keeps the list focused (or the back button when the list becomes
+  empty) so the remote still has a target. Do not make the row button `focusable` — that
+  breaks `OnItemClickListener` for touch and ENTER.
 - Remote seeking is handled explicitly in `MainActivity` (`miniProgress` `OnKeyListener`,
   ±5 s per LEFT/RIGHT) because TV boxes may not move a `SeekBar` with the D-pad. UP/DOWN
   leave the seek bar for `miniInfo`/`miniPlay`.

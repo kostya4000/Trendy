@@ -65,7 +65,7 @@
     <string name="favorites">Избранное</string>
     <string name="favorites_summary">%1$d %2$s в избранном</string>
     <string name="favorites_empty">Здесь появятся треки, добавленные в избранное.</string>
-    <string name="favorites_hint">Нажмите на трек, чтобы включить его. «Убрать» удаляет трек из избранного. В ленте избранное переключается удержанием строки, а в плеере — кнопкой с сердцем.</string>
+    <string name="favorites_hint">Нажмите на трек, чтобы включить его. «Убрать» удаляет трек из избранного. С пульта стрелка вправо выделяет «Убрать», OK нажимает. В ленте избранное переключается удержанием строки, а в плеере — кнопкой с сердцем.</string>
     <string name="favorites_remove">Убрать</string>
     <string name="favorite_add">В избранное</string>
     <string name="favorite_remove">Убрать из избранного</string>

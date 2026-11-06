@@ -1,6 +1,7 @@
 package com.promodj.trendy;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Список избранных треков: нажатие играет, «Убрать» убирает из избранного. */
-public class FavoritesAdapter extends BaseAdapter {
+public class FavoritesAdapter extends BaseAdapter implements Ui.RowAction {
 
     interface Listener {
         void onPlay(Track track);
@@ -23,11 +24,14 @@ public class FavoritesAdapter extends BaseAdapter {
     private final LayoutInflater inflater;
     private final Listener listener;
     private final List<Track> items = new ArrayList<>();
+    private final Drawable actionRing;
+    private int actionPosition = -1;
 
     FavoritesAdapter(Context context, Listener listener) {
         this.context = context;
         this.inflater = LayoutInflater.from(context);
         this.listener = listener;
+        this.actionRing = context.getDrawable(R.drawable.bg_focus_ring_solid);
     }
 
     void setItems(List<Track> tracks) {
@@ -46,6 +50,36 @@ public class FavoritesAdapter extends BaseAdapter {
     @Override
     public Track getItem(int position) {
         return items.get(position);
+    }
+
+    @Override
+    public int getActionPosition() {
+        return actionPosition;
+    }
+
+    @Override
+    public void setActionPosition(int position) {
+        if (actionPosition == position) {
+            return;
+        }
+        actionPosition = position;
+        notifyDataSetChanged();
+    }
+
+    @Override
+    public void performAction(int position) {
+        if (position < 0 || position >= items.size() || listener == null) {
+            return;
+        }
+        listener.onRemove(items.get(position));
+    }
+
+    @Override
+    public void performPrimary(int position) {
+        if (position < 0 || position >= items.size() || listener == null) {
+            return;
+        }
+        listener.onPlay(items.get(position));
     }
 
     @Override
@@ -73,14 +107,7 @@ public class FavoritesAdapter extends BaseAdapter {
         holder.title.setText(track.title);
         holder.subtitle.setText(subtitle(track));
         ImageLoader.get(context).load(track.coverUrl, holder.cover);
-        convertView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (listener != null) {
-                    listener.onPlay(track);
-                }
-            }
-        });
+        holder.remove.setForeground(position == actionPosition ? actionRing : null);
         holder.remove.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {

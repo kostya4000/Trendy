@@ -73,6 +73,14 @@ public class SettingsActivity extends Activity {
             }
         });
         list.setAdapter(adapter);
+        list.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(android.widget.AdapterView<?> parent, View view,
+                    int position, long id) {
+                playSaved(adapter.getSaved(position));
+            }
+        });
+        Ui.bindRowAction(list, adapter);
 
         clearTempButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -188,7 +196,15 @@ public class SettingsActivity extends Activity {
                         }
                         Toast.makeText(SettingsActivity.this,
                                 R.string.settings_deleted, Toast.LENGTH_SHORT).show();
+                        int position = list.getSelectedItemPosition();
                         reload();
+                        if (adapter.getCount() > 0) {
+                            list.setSelection(Math.min(Math.max(position, 0),
+                                    adapter.getCount() - 1));
+                            list.requestFocus();
+                        } else {
+                            findViewById(R.id.settingsBack).requestFocus();
+                        }
                     }
                 });
             }

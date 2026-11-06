@@ -1,6 +1,7 @@
 package com.promodj.trendy;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Список сохранённых треков на экране настроек. */
-public class SavedAdapter extends BaseAdapter {
+public class SavedAdapter extends BaseAdapter implements Ui.RowAction {
 
     interface Listener {
         void onPlay(AudioCache.Saved saved);
@@ -23,11 +24,14 @@ public class SavedAdapter extends BaseAdapter {
     private final LayoutInflater inflater;
     private final Listener listener;
     private final List<AudioCache.Saved> items = new ArrayList<>();
+    private final Drawable actionRing;
+    private int actionPosition = -1;
 
     SavedAdapter(Context context, Listener listener) {
         this.context = context;
         this.inflater = LayoutInflater.from(context);
         this.listener = listener;
+        this.actionRing = context.getDrawable(R.drawable.bg_focus_ring_solid);
     }
 
     void setItems(List<AudioCache.Saved> saved) {
@@ -50,6 +54,36 @@ public class SavedAdapter extends BaseAdapter {
     @Override
     public Object getItem(int position) {
         return items.get(position);
+    }
+
+    @Override
+    public int getActionPosition() {
+        return actionPosition;
+    }
+
+    @Override
+    public void setActionPosition(int position) {
+        if (actionPosition == position) {
+            return;
+        }
+        actionPosition = position;
+        notifyDataSetChanged();
+    }
+
+    @Override
+    public void performAction(int position) {
+        if (position < 0 || position >= items.size() || listener == null) {
+            return;
+        }
+        listener.onDelete(items.get(position));
+    }
+
+    @Override
+    public void performPrimary(int position) {
+        if (position < 0 || position >= items.size() || listener == null) {
+            return;
+        }
+        listener.onPlay(items.get(position));
     }
 
     @Override
@@ -77,14 +111,7 @@ public class SavedAdapter extends BaseAdapter {
         holder.title.setText(track.title);
         holder.subtitle.setText(subtitle(saved));
         ImageLoader.get(context).load(track.coverUrl, holder.cover);
-        convertView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (listener != null) {
-                    listener.onPlay(saved);
-                }
-            }
-        });
+        holder.delete.setForeground(position == actionPosition ? actionRing : null);
         holder.delete.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {

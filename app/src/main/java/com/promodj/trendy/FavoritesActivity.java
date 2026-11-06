@@ -48,6 +48,14 @@ public class FavoritesActivity extends Activity {
             }
         });
         list.setAdapter(adapter);
+        list.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(android.widget.AdapterView<?> parent, View view,
+                    int position, long id) {
+                play(adapter.getItem(position));
+            }
+        });
+        Ui.bindRowAction(list, adapter);
         reload();
     }
 
@@ -65,6 +73,16 @@ public class FavoritesActivity extends Activity {
         boolean hasItems = !favorites.isEmpty();
         list.setVisibility(hasItems ? View.VISIBLE : View.GONE);
         emptyState.setVisibility(hasItems ? View.GONE : View.VISIBLE);
+    }
+
+    /** После удаления фокус не должен потеряться: у пустого списка его не вернуть. */
+    private void focusAfterReload(int position) {
+        if (adapter.getCount() > 0) {
+            list.setSelection(Math.min(Math.max(position, 0), adapter.getCount() - 1));
+            list.requestFocus();
+        } else {
+            findViewById(R.id.favoritesBack).requestFocus();
+        }
     }
 
     private void play(Track track) {
@@ -91,8 +109,10 @@ public class FavoritesActivity extends Activity {
         if (track == null) {
             return;
         }
+        int position = list.getSelectedItemPosition();
         Favorites.remove(this, track.id);
         reload();
+        focusAfterReload(position);
         Toast.makeText(this, R.string.favorite_removed, Toast.LENGTH_SHORT).show();
     }
 }
