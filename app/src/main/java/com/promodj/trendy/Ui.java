@@ -1,6 +1,7 @@
 package com.promodj.trendy;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.view.KeyEvent;
@@ -58,6 +59,26 @@ final class Ui {
             }
         });
         view.requestApplyInsets();
+    }
+
+    /**
+     * Магнитолы и планшеты отдают большой холст в dp (например, 1280x720 при
+     * 160 dpi), и рассчитанные на ~360-420dp макеты выглядят на них мелкими.
+     * Поднимаем плотность, чтобы dp-размеры стали крупнее; телефоны и ТВ с
+     * обычной плотностью не трогаем.
+     */
+    static Context scaleForLargeScreen(Context base) {
+        Configuration config = base.getResources().getConfiguration();
+        if (config.screenHeightDp < 600 || config.screenWidthDp < 720) {
+            return base;
+        }
+        float factor = Math.min(1.8f, config.screenHeightDp / 420f);
+        if (factor < 1.05f) {
+            return base;
+        }
+        Configuration scaled = new Configuration(config);
+        scaled.densityDpi = Math.round(config.densityDpi * factor);
+        return base.createConfigurationContext(scaled);
     }
 
     /** Строка списка с действием, до которого нужно добраться пультом. */

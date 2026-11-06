@@ -81,6 +81,11 @@ public class PlayerActivity extends Activity implements PlayerService.Listener {
     };
 
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(Ui.scaleForLargeScreen(base));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Ui.darkSystemBars(this);

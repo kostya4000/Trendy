@@ -68,6 +68,15 @@ AndroidX, no third-party dependencies, and Russian UI text.
   inset to the bottom padding. Without it the last row of buttons is cut off. The landscape
   main panel and player are compacted to fit a 360dp-high screen (hiding the cover is
   expected there); keep their fixed heights small when editing.
+- Head units (Teyes and similar) report a huge dp canvas — 1280x720 px at 160 dpi — so the
+  360-420dp layouts look tiny. Every activity overrides `attachBaseContext` with
+  `Ui.scaleForLargeScreen`, which raises `densityDpi` by `screenHeightDp / 420` (capped at
+  1.8x) when the window is at least 720dp wide and 600dp tall. Phones (narrow or short) and
+  540dp-tall TVs are untouched. Test big-screen changes with `wm size 720x1280 && wm density
+  160` + landscape rotation.
+- In `layout-land/activity_player.xml` the action row (`cache`/`download`/`openSite`) is a
+  sibling of the cover row pinned to the bottom of the screen, not part of the info column;
+  keep it there — on head units the buttons must sit at the bottom edge.
 - `layout-land/activity_main.xml` is a two-pane screen: `@id/playerPanel` on the left with the
   mini-player ids (`miniCover`, `miniTitle`, `miniArtist`, `miniProgress` as SeekBar,
   `miniPrev`, `miniPlay`, `miniNext`) plus `panelCache`/`panelDownload`, list and filters on

@@ -1,6 +1,7 @@
 package com.promodj.trendy;
 
 import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ListView;
@@ -17,6 +18,11 @@ public class FavoritesActivity extends Activity {
     private TextView summary;
     private TextView emptyState;
     private FavoritesAdapter adapter;
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(Ui.scaleForLargeScreen(base));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

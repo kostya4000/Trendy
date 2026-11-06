@@ -1,6 +1,7 @@
 package com.promodj.trendy;
 
 import android.app.Activity;
+import android.content.Context;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
@@ -38,6 +39,11 @@ public class SettingsActivity extends Activity {
     private SavedAdapter adapter;
 
     private volatile long loadSerial;
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(Ui.scaleForLargeScreen(base));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
