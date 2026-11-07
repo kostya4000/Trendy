@@ -6,6 +6,7 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -36,6 +37,7 @@ public class SettingsActivity extends Activity {
     private TextView emptyState;
     private TextView clearTempButton;
     private TextView deleteAllButton;
+    private TextView versionInfo;
     private SavedAdapter adapter;
 
     private volatile long loadSerial;
@@ -59,6 +61,13 @@ public class SettingsActivity extends Activity {
         emptyState = (TextView) findViewById(R.id.settingsEmpty);
         clearTempButton = (TextView) findViewById(R.id.settingsClearTemp);
         deleteAllButton = (TextView) findViewById(R.id.settingsDeleteAll);
+        versionInfo = (TextView) findViewById(R.id.settingsVersion);
+        String version = versionName();
+        if (version.length() > 0) {
+            versionInfo.setText(getString(R.string.settings_version, version));
+        } else {
+            versionInfo.setVisibility(View.GONE);
+        }
 
         findViewById(R.id.settingsBack).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -162,6 +171,16 @@ public class SettingsActivity extends Activity {
         deleteAllButton.setAlpha(hasSaved ? 1f : 0.45f);
         clearTempButton.setEnabled(tempBytes > 0);
         clearTempButton.setAlpha(tempBytes > 0 ? 1f : 0.45f);
+    }
+
+    /** Версия из манифеста: её проставляет и build.sh, и Gradle из version.properties. */
+    private String versionName() {
+        try {
+            String name = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            return name == null ? "" : name;
+        } catch (PackageManager.NameNotFoundException e) {
+            return "";
+        }
     }
 
     private void playSaved(AudioCache.Saved saved) {
